@@ -1,42 +1,16 @@
+#include "main.hpp"
 #include <iostream>
-#include <string>
-#include <argp.h>
-
-static error_t parse_opts(int, char *, argp_state *);
-
-char doc[] = "";
-char args_doc[] = "";
-struct arguments {
-    std::string pscript_file{ "hw1.ps" };
-    float scaling_factor{ 1.0f };
-    int rot_deg{ 0 };
-    int x_translation{ 0 };
-    int y_translation{ 0 };
-    int x_lower_bound{ 0 };
-    int y_lower_bound{ 0 };
-    int x_upper_bound{ 499 };
-    int y_upper_bound{ 499 };
-};
-
-const argp_option options[] {
-    {0, 'f', "postscript file", 0, "the input postscript file"},
-    {0, 's', "scaling factor", 0, "a float specifying the scaling factor in both dimensions about the world origin"},
-    {0, 'r', "rotational degrees", 0, "an integer specifying the number of degrees for couter-clockwise rotation about the world origin"},
-    {0, 'm', "x translation", 0, "an integer specifying the translation in the x dimension"},
-    {0, 'n', "y translation", 0, "an integer specifying the translation in the y dimension"},
-    {0, 'a', "x lower bound", 0, "an integer lower bound in the x dimension of the world window"},
-    {0, 'b', "y lower bound", 0, "an integer lower bound in the y dimension of the world window"},
-    {0, 'c', "x upper bound", 0, "an integer upper bound in the x dimension of the world window"},
-    {0, 'd', "y upper bound", 0, "an integer upper bound in the y dimension of the world window"},
-    {0},
-};
-
-struct argp argp { options, parse_opts, args_doc, doc };
 
 int main(int argc, char *argv[])
 {
     arguments args;
     argp_parse(&argp, argc, argv, 0, 0, &args);
+
+    size_t cols = (size_t)(args.x_upper_bound - args.x_lower_bound);
+    size_t rows = (size_t)(args.y_upper_bound - args.y_lower_bound);
+
+    std::vector<std::vector<uint8_t>> pixels{ rows, std::vector<uint8_t>( cols ) };
+    parsePSFile(&args, &pixels);
 }
 
 static error_t parse_opts(int key, char *arg_char, argp_state *state)
@@ -96,6 +70,64 @@ static error_t parse_opts(int key, char *arg_char, argp_state *state)
     return 0;
 }
 
+void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
+{
+    std::cerr << "Parsing file " << args->pscript_file << "\n";
+    const std::string WHITESPACE = " \t\r\n\f\v";
 
+    transforms transforms{ args->scaling_factor, args->rot_deg, args->x_translation, args->y_translation };
+    std::string line;
+    bool cmd_block{ false };
+    std::ifstream ps_file{ args->pscript_file };
+    if(ps_file.is_open())
+    {
+	while(std::getline(ps_file, line))
+	{
+	    std::cerr << line << "\n";
+	    if(line.substr(0, 8) == "%%%BEGIN")
+	    {
+		cmd_block = true;
+		continue;
+	    }
+
+	    if(line.substr(0, 6) == "%%%END")
+	    {
+		cmd_block = false;
+		continue;
+	    }
+
+	    // In the command block and it has more than just whitespace
+	    if(cmd_block && !isspace(line[0]))
+	    {
+		// Trim right whitespace
+		while(isspace(line[line.length() - 1]))
+		    line = line.substr(0, line.length() - 2);
+
+		std::string cmd{ line.substr(line.rfind(' ') + 1) };
+		if(cmd == "Line")
+		{
+		    int cmd_parts[4];
+		    int idx{ 0 };
+		    size_t start{ 0 };
+		    size_t end{ line.find(' ') };
+
+		    // Splits line using whitespace
+		    while(end != std::string::npos)
+		    {
+			cmd_parts[idx] = stoi(line.substr(start, end - start));
+			start = end + 1;
+			end = line.find(' ', start);
+			idx++;
+		    }
+
+		    applyTransformations(&cmd_parts[0], &transforms);
+		    clipLines();
+                    scanConversion(&cmd_parts[0], &pixels);
+		}
+	    }
+	}
+	ps_file.close();
+    }
+}
 
 
