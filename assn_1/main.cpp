@@ -1,16 +1,21 @@
 #include "main.hpp"
 #include <iostream>
+#include <string>
 
 int main(int argc, char *argv[])
 {
     arguments args;
     argp_parse(&argp, argc, argv, 0, 0, &args);
 
-    size_t cols = (size_t)(args.x_upper_bound - args.x_lower_bound);
-    size_t rows = (size_t)(args.y_upper_bound - args.y_lower_bound);
+    std::cerr << "Arguments are " << args.pscript_file << " " << args.scaling_factor << " " << args.rot_deg
+	    << " " << args.x_translation << " " << args.y_translation << " " << args.x_lower_bound << " " << args.y_lower_bound << "\n";
+    
+    size_t x = (size_t)(args.x_upper_bound - args.x_lower_bound + 1);
+    size_t y = (size_t)(args.y_upper_bound - args.y_lower_bound + 1);
 
-    std::vector<std::vector<uint8_t>> pixels{ rows, std::vector<uint8_t>( cols ) };
+    std::vector<std::vector<uint8_t>> pixels{ y, std::vector<uint8_t>( x ) };
     parsePSFile(&args, &pixels);
+    printPBM(&pixels);
 }
 
 static error_t parse_opts(int key, char *arg_char, argp_state *state)
@@ -76,6 +81,9 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
     const std::string WHITESPACE = " \t\r\n\f\v";
 
     transforms transforms{ args->scaling_factor, args->rot_deg, args->x_translation, args->y_translation };
+    bounds x_bounds{ args->x_lower_bound, args->x_upper_bound };
+    bounds y_bounds{ args->y_lower_bound, args->y_upper_bound };
+
     std::string line;
     bool cmd_block{ false };
     std::ifstream ps_file{ args->pscript_file };
@@ -106,7 +114,7 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 		std::string cmd{ line.substr(line.rfind(' ') + 1) };
 		if(cmd == "Line")
 		{
-		    int cmd_parts[4];
+		    float cmd_parts[4];
 		    int idx{ 0 };
 		    size_t start{ 0 };
 		    size_t end{ line.find(' ') };
@@ -121,13 +129,34 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 		    }
 
 		    applyTransformations(&cmd_parts[0], &transforms);
-		    clipLines();
-                    scanConversion(&cmd_parts[0], &pixels);
+		    int draw_line{ clipLine(&cmd_parts[0], &x_bounds, &y_bounds) };
+                    if(draw_line)
+			scanConversion(&cmd_parts[0], pixels, &x_bounds, &y_bounds);
 		}
 	    }
 	}
 	ps_file.close();
     }
 }
+
+void printPBM(std::vector<std::vector<uint8_t>> *pixels)
+{
+    int x_size = (*pixels)[0].size();
+    int y_size = (*pixels).size();
+
+    std::cout << "P1\n" << x_size << " " << y_size << "\n";
+    for(int y = y_size - 1; y >= 0; --y)
+    {
+	std::string line;
+	for(int x = 0; x < x_size; ++x)
+	    line += std::to_string((*pixels)[y][x]) + " ";
+	std::cout << line.substr(0, line.length() - 1) << "\n";
+    }
+	    
+
+}
+
+
+
 
 

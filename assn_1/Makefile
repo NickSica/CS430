@@ -7,7 +7,7 @@ build: main.cpp draw.cpp
 	$(cc) $^ -g -o $(name)
 
 test: build
-	mkdir test
+	-mkdir test_outputs
 	@echo "Default"
 	./$(name) > ./test_outputs/out.pbm
 	@echo "HW 1"

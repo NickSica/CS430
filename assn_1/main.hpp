@@ -42,7 +42,6 @@ static error_t parse_opts(int, char *, argp_state *);
 struct argp argp { options, parse_opts, args_doc, doc };
 
 void parsePSFile(arguments *, std::vector<std::vector<uint8_t>> *);
-void scanConversion();
-void clipLines();
+void printPBM(std::vector<std::vector<uint8_t>> *);
 
 #endif
