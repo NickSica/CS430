@@ -4,7 +4,7 @@ name = CG_hw1
 .PHONY = clean
 
 build: main.cpp draw.cpp
-	$(cc) $^ -g -o $(name)
+	$(cc) $^ -o $(name)
 
 test: build
 	@echo "Default"

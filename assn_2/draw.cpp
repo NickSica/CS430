@@ -105,6 +105,11 @@ int clipLine(float *cmd_parts, bounds *x_bounds, bounds *y_bounds)
     return 1;
 }
 
+void clipPolygon(float *cmd_parts, bound *x_bounds, bounds *y_bounds)
+{
+    
+}
+
 // Uses DDA algorithm to scan convert lines
 void scanConversion(float *cmd_parts, std::vector<std::vector<uint8_t>> *pixels, bounds *x_bounds, bounds *y_bounds)
 {
