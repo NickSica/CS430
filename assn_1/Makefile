@@ -25,4 +25,3 @@ test: build
 clean:
 	-rm -r *.pbm
 	-rm $(name)
-

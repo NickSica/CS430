@@ -24,5 +24,3 @@ int clipLine(float *, bounds *, bounds *);
 void scanConversion(float *, std::vector<std::vector<uint8_t>> *, bounds *, bounds *);
 
 #endif
-
-
