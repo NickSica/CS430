@@ -5,6 +5,7 @@
 #include <string>
 #include <argp.h>
 #include <fstream>
+#include <array>
 #include <vector>
 #include <cctype>
 
@@ -13,7 +14,7 @@
 char doc[] = "";
 char args_doc[] = "";
 struct arguments {
-    std::string pscript_file{ "hw1.ps" };
+    std::string pscript_file{ "hw2_a.ps" };
     float scaling_factor{ 1.0f };
     int rot_deg{ 0 };
     int x_translation{ 0 };
@@ -42,6 +43,7 @@ static error_t parse_opts(int, char *, argp_state *);
 struct argp argp { options, parse_opts, args_doc, doc };
 
 void parsePSFile(arguments *, std::vector<std::vector<uint8_t>> *);
+int splitLines(std::string, char, std::string *, int);
 void printPBM(std::vector<std::vector<uint8_t>> *);
 
 #endif

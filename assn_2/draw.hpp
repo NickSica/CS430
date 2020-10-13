@@ -19,8 +19,14 @@ struct bounds {
     int upper;
 };
 
-void applyTransformations(float *, transforms *);
+struct coords {
+    float x;
+    float y;
+};
+
+void applyTransformations(float *, int, transforms *);
 int clipLine(float *, bounds *, bounds *);
+void clipPolygon(std::vector<coords> *, bounds *, bounds *);
 void scanConversion(float *, std::vector<std::vector<uint8_t>> *, bounds *, bounds *);
 
 #endif
