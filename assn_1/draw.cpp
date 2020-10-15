@@ -1,4 +1,4 @@
-#include "draw.hpp"
+#include "draw.h"
 
 // Apply scaling, rotation, and translation transformations
 void applyTransformations(float *coords, transforms *transforms)

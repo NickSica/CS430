@@ -9,7 +9,7 @@
 #include <vector>
 #include <cctype>
 
-#include "draw.hpp"
+#include "draw.h"
 
 char doc[] = "";
 char args_doc[] = "";
