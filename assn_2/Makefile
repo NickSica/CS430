@@ -27,5 +27,5 @@ test: build
 	./$(name) -f hw2_c.ps -a -150 -b -475 -c 123 -d -65 > hw2_ex9.pbm
 
 clean:
-	-rm -r *.pbm 
+	-rm -r *.pbm
 	-rm $(name)
