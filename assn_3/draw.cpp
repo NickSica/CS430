@@ -19,38 +19,21 @@ void applyTransformations(float *coord, int length, arguments *args)
 		coord[i] = temp_coord.x;
 		coord[i + 1] = temp_coord.y;
 	}
-	 /*
-	// World Window to Viewport Window Transformation
-	// First translate to origin
-	translateCoord(coord, length, -args->x_translation, -args->y_translation);
-
-	// Second scale to viewport size
-    scaling_factors[0] = (float)(args->vw_x_upper_bound - args->vw_x_lower_bound) / (float)(args->ww_x_upper_bound - args->ww_x_lower_bound); 
-	scaling_factors[1] = (float)(args->vw_y_upper_bound - args->vw_y_lower_bound) / (float)(args->ww_y_upper_bound - args->ww_y_lower_bound); 
-	scaleCoord(coord, length, scaling_factors);
-	
-	// Third translate to final position
-	translateCoord(coord, length, args->vw_x_lower_bound, args->vw_y_lower_bound);
-	*/
 }
 
-void windowToViewport(coordinate *coord, int length, arguments *args)
+void worldToViewport(coordinate *coord, int length, arguments *args)
 {
-	for(int i = 0; i < length; i++)
-	{
-		// First translate to origin
-		translateCoord(&(coord[i]), -args->x_translation, -args->y_translation);
-		
-		// Second scale to viewport size
-		float x_scale = (float)(args->vw_x_upper_bound - args->vw_x_lower_bound) / (float)(args->ww_x_upper_bound - args->ww_x_lower_bound); 
-		float y_scale = (float)(args->vw_y_upper_bound - args->vw_y_lower_bound) / (float)(args->ww_y_upper_bound - args->ww_y_lower_bound); 
-		float scaling_factors[2] { x_scale, y_scale };
-		scaleCoord(&(coord[i]), scaling_factors);
-		
-		// Third translate to final position
-		translateCoord(&(coord[i]), args->vw_x_lower_bound, args->vw_y_lower_bound);
-
-	}
+	float x_scale = (float)(args->vw_x_upper_bound - args->vw_x_lower_bound) / (float)(args->ww_x_upper_bound - args->ww_x_lower_bound); 
+	float y_scale = (float)(args->vw_y_upper_bound - args->vw_y_lower_bound) / (float)(args->ww_y_upper_bound - args->ww_y_lower_bound); 
+	float scaling_factors[2] { x_scale, y_scale };
+	// First translate to origin
+	translateCoord(coord, -args->ww_x_lower_bound, -args->ww_y_lower_bound);
+	
+	// Second scale to viewport size
+	scaleCoord(coord, scaling_factors);
+	
+	// Third translate to final position
+	translateCoord(coord, args->vw_x_lower_bound, args->vw_y_lower_bound);
 }
 	
 void scaleCoord(coordinate *coord, float *scaling_factors)
@@ -231,6 +214,7 @@ void clipPolygon(std::vector<coordinate> *vertices, bounds *x_bounds, bounds *y_
 			}
 			else if(v1_in && !v2_in)
 			{
+				std::cerr << "Clipping (" << x2 << ", " << y2 << ")";
 				if(i < 2)
 				{
 					y2 = (y2 - y1) * (xc - x1) / (x2 - x1) + y1;
@@ -246,6 +230,7 @@ void clipPolygon(std::vector<coordinate> *vertices, bounds *x_bounds, bounds *y_
 			}
 			else if(!v1_in && v2_in)
 			{
+				std::cerr << "Clipping (" << x1 << ", " << y1 << ")";
 				if(i < 2)
 				{
 					y1 = (y1 - y2) * (xc - x2) / (x1 - x2) + y2;
@@ -268,6 +253,7 @@ void clipPolygon(std::vector<coordinate> *vertices, bounds *x_bounds, bounds *y_
 		*vertices = new_vertices;
 		vertices->resize(idx);
 		vertices->push_back((*vertices)[0]);
+		
 		if(i == 1)
 			bounds = y_bounds;
 	}
@@ -281,36 +267,32 @@ void fillPolygon(std::vector<std::vector<uint8_t>> *pixels, std::vector<coordina
 	for(int i = 0; i < scan_lines.capacity(); ++i)
 		scan_lines[i].reserve(vertices->size());
 
-	float poly_y_min = (*vertices)[0].y;
-	float poly_y_max = (*vertices)[0].y;
+	int poly_y_min = (int)round((*vertices)[0].y);
+	int poly_y_max = (int)round((*vertices)[0].y);
 	for(int i = 0; i < vertices->size() - 1; ++i)
 	{
-		if(poly_y_max < (*vertices)[i + 1].y)
-			poly_y_max = (*vertices)[i + 1].y;
+		int x1{ (int)round((*vertices)[i].x) };
+		int y1{ (int)round((*vertices)[i].y) };
+		int x2{ (int)round((*vertices)[i + 1].x) };
+		int y2{ (int)round((*vertices)[i + 1].y) };
+		if(poly_y_max < y2)
+			poly_y_max = y2;
 
-		if(poly_y_min > (*vertices)[i + 1].y)
-			poly_y_min = (*vertices)[i + 1].y;
+		if(poly_y_min > y2)
+			poly_y_min = y2;
 		
-		coordinate min_vertex = (*vertices)[i];
-		coordinate max_vertex = (*vertices)[i + 1];
-
-		
-		if ((*vertices)[i].y > (*vertices)[i + 1].y)
+		if (y1 > y2)
 		{
-			min_vertex = (*vertices)[i + 1];
-			max_vertex = (*vertices)[i];
+			std::swap(y1, y2);
+			std::swap(x1, x2);
 		}
 		
-		for(int j = (int)floor(min_vertex.y); j < (int)ceil(max_vertex.y); ++j)
+		for(int j = y1; j < y2; ++j)
 		{
-			float x1 { min_vertex.x };
-			float y1 { min_vertex.y };
-			float x2 { max_vertex.x };
-			float y2 { max_vertex.y };
-			std::cerr << "j is " << j << " Vertices are (" << x1 << ", " << y1 << ") and (" << x2 << ", " << y2 << ")\n";
+//			std::cerr << "j is " << j << " Vertices are (" << x1 << ", " << y1 << ") and (" << x2 << ", " << y2 << ")\n";
 			if(y2 != y1)
 			{
-				int new_x = (int)ceil(x2 - (y2 - (float)j) * (x2 - x1) / (y2 - y1));
+				int new_x = (int)round(x2 - (y2 - j) * (x2 - x1) / (float)(y2 - y1));
 				scan_lines[j].push_back(new_x);
 			}
 		}
@@ -318,8 +300,7 @@ void fillPolygon(std::vector<std::vector<uint8_t>> *pixels, std::vector<coordina
 
 	std::cerr << "Max poly y is " << poly_y_max << " Min poly y is " << poly_y_min << '\n';
 	
-	
-	for(int i = (int)floor(poly_y_min); i < (int)ceil(poly_y_max); i++)
+	for(int i = poly_y_min; i < poly_y_max; i++)
 	{
 		if(scan_lines[i].empty())
 			continue;
@@ -331,12 +312,15 @@ void fillPolygon(std::vector<std::vector<uint8_t>> *pixels, std::vector<coordina
 		uint8_t fill_val = 0;
 		for(int j = x_bounds->lower; j < x_bounds->upper; ++j)
 		{
-			(*pixels)[i][j] = fill_val;
-			if(j == intersections[intersect_idx])
+			if(intersect_idx < intersections.size() && j >= intersections[intersect_idx])
 			{
-				fill_val = (fill_val == 1) ? 0 : 1;
+				(*pixels)[i][j] = 1;
+				fill_val = ~fill_val;
 				++intersect_idx;
 			}
+
+			if(fill_val != 0)
+				(*pixels)[i][j] = 1;
 		}
 	}
 }

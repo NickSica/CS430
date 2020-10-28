@@ -44,7 +44,7 @@ struct edge {
 };
 
 void applyTransformations(float *, int, arguments *);
-void windowToViewport(coordinate *, int, arguments *);
+void worldToViewport(coordinate *, int, arguments *);
 void scaleCoord(coordinate *, float *);
 void rotateCoord(coordinate *, int);
 void translateCoord(coordinate *, int, int);

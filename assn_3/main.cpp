@@ -94,9 +94,10 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 {
 	std::cerr << "Parsing file " << args->pscript_file << "\n";
 	const std::string WHITESPACE = " \t\r\n\f\v";
-
-	bounds x_bounds{ args->vw_x_lower_bound, args->vw_x_upper_bound };
-	bounds y_bounds{ args->vw_y_lower_bound, args->vw_y_upper_bound };
+	bounds ww_x_bounds{ args->ww_x_lower_bound, args->ww_x_upper_bound };
+	bounds ww_y_bounds{ args->ww_y_lower_bound, args->ww_y_upper_bound };
+	bounds vw_x_bounds{ args->vw_x_lower_bound, args->vw_x_upper_bound };
+	bounds vw_y_bounds{ args->vw_y_lower_bound, args->vw_y_upper_bound };
 
 	std::string line;
 	bool cmd_block{ false };
@@ -118,7 +119,7 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 		}
 		
 		// In the command block and it has more than just whitespace
-		if(cmd_block && !isspace(line[0]))
+		if(cmd_block && line.find_first_not_of(WHITESPACE) != std::string::npos)
 		{
 			// Trim right whitespace
 			while(isspace(line[line.length() - 1]))
@@ -140,16 +141,16 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 					cmd_parts[i] = std::stoi(line_parts[i]);
 				
 				applyTransformations(&cmd_parts[0], length, args);
-				int draw_line{ clipLine(&cmd_parts[0], &x_bounds, &y_bounds) };
+				int draw_line{ clipLine(&cmd_parts[0], &ww_x_bounds, &ww_y_bounds) };
 
 				coordinate coords[2]{ { cmd_parts[0], cmd_parts[1] }, { cmd_parts[2], cmd_parts[3] } };
-				windowToViewport(coords, length / 2, args);
+				worldToViewport(coords, length / 2, args);
 				cmd_parts[0] = coords[0].x;
 				cmd_parts[1] = coords[0].y;
 				cmd_parts[2] = coords[1].x;
 				cmd_parts[3] = coords[1].y;
 				if(draw_line)
-					scanConversion(&cmd_parts[0], pixels, &x_bounds, &y_bounds);
+					scanConversion(&cmd_parts[0], pixels, &vw_x_bounds, &vw_y_bounds);
 			}
 			else if(cmd == "moveto")
 			{
@@ -180,12 +181,12 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 			}
 			else if(cmd == "stroke")
 			{
-				clipPolygon(&vertices, &x_bounds, &y_bounds);
+				clipPolygon(&vertices, &ww_x_bounds, &ww_y_bounds);
 				int length = 2;
 				for(int i = 0; i < vertices.size(); ++i)
-					windowToViewport(&(vertices[i]), length, args);
-					
-				fillPolygon(pixels, &vertices, &x_bounds, &y_bounds);
+					worldToViewport(&(vertices[i]), length, args);
+
+				fillPolygon(pixels, &vertices, &vw_x_bounds, &vw_y_bounds);
 			}
 		}
 	}
@@ -231,4 +232,3 @@ void printPBM(std::vector<std::vector<uint8_t>> *pixels)
 	std::cout << line.substr(0, line.length() - 1) << "\n";
 	}
 }
-

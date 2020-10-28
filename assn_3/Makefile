@@ -1,6 +1,6 @@
 cc = g++
 name = CG_hw3
-ps_file = hw3_split.ps
+ps_file = hw3.ps
 
 .PHONY = clean
 
