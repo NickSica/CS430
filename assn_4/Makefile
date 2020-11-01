@@ -1,6 +1,6 @@
 cc = g++
-name = CG_hw3
-ps_file = hw3.ps
+name = CG_hw4
+smf_file = bound-lo-sphere.smf
 
 .PHONY = clean
 
@@ -8,22 +8,48 @@ build: main.cpp draw.cpp
 	$(cc) $^ -g -o $(name)
 
 test: build
-	@echo "Starting a"
-	./$(name) -f $(ps_file) > hw3_a.pbm
-	@echo "Starting b"
-	./$(name) -f $(ps_file) -a 0 -b 0 -c 500 -d 500 -j 0 -k 0 -o 500 -p 500 -s 1.0 -m 0 -n 0 -r 0 > hw3_b.pbm
-	@echo "Starting c"
-	./$(name) -f $(ps_file) -a 50 -b 0 -c 325 -d 500 -j 0 -k 110 -o 480 -p 410 -s 1 -m 0 -n 0 -r 0 > hw3_c.pbm
-	@echo "Starting d"
-	./$(name) -f $(ps_file) -a 10 -b 10 -c 550 -d 400 -j 10 -k 10 -o 500 -p 400 -s 1.2 -m 6 -n 25 -r 8 > hw3_d.pbm
-	@echo "Starting e"
-	./$(name) -b 62 -c 500 -d 479 -r 75 -j 139 -o 404 -p 461 -s .85 -m 300 > hw3_e.pbm
-	@echo "Starting f"
-	./$(name) -a 275 -b 81 -c 550 -d 502 -r -37 -j 123 -k 217 -o 373 -p 467 > hw3_f.pbm
-	@echo "Starting g"
-	./$(name) -f $(ps_file) -d 301 -c 435 -b 170 -a -100 -r -23 > hw3_g.pbm
-	@echo "Starting h"
-	./$(name) -f $(ps_file) -a -135 -b -53 -c 633 -d 842 -m -23 -j 101 -p 415 -s 3.6 > hw3_h.pbm
+	@echo "Starting default"
+	./$(name) > out.pbm
+	@echo "Starting circle 1"
+	./$(name) -f $(smf_file) -x -1.0 -z 0.5 -q 1.0 -w -0.5 > out.pbm
+	@echo "Starting circle 2"
+	./$(name) -f $(smf_file) -q 1.0 -w -1.0 > out.pbm
+	@echo "Starting circle 3"
+	./$(name) -f $(smf_file) -x -4.0 -z 5.0 -q 1.0 -w -0.5 > out.pbm
+	@echo "Starting circle 4"
+	./$(name) -f $(smf_file) -k 125 -p 375 -q 1.0 -u -1.4 -U 1.4 > out.pbm
+	@echo "Switching to bunny"
+	$(eval smf_file=bound-bunny_200.smf)
+	@echo "Starting bunny f"
+	./$(name) -f $(smf_file) -j 100 -k 50 -o 400 -p 450 -x 0.5 -y 0.2 -z 1.0 -X 0.2 -Y -0.2 -Z 0.3 -q -3.0 -r -2.0 -w 1.0 -Q 3.0 -R -2 -W -4.0 -u -.5 -v -.9 -U 1.2 -V .8 -P > hw4_f.pbm
+	@echo "Starting bunny g"
+	./$(name) -f $(smf_file) -j 100 -k 50 -o 400 -p 450 -x 0.5 -y 0.2 -z 1.0 -X 0.2 -Y -0.2 -Z 0.3 -q -3.0 -r -2.0 -w 1.0 -Q 3.0 -R -2 -W -4.0 -u -.5 -v -.9 -U 1.2 -V .8 > hw4_g.pbm
+	@echo "Switching to cow"
+	$(eval smf_file=bound-cow.smf)
+	@echo "Starting cow default"
+	./$(name) -f $(smf_file) > cow_default.pbm
+	@echo "Starting cow parallel"
+	./$(name) -f $(smf_file) -P > cow_parallel.pbm
+	@echo "Starting cow jkopP"
+	./$(name) -f $(smf_file) -j 0 -k 30 -o 275 -p 305 -P > cow_jkopP.pbm
+	@echo "Starting cow x1.5"
+	./$(name) -f $(smf_file) -x 1.5 > cow_x1.5.pbm
+	@echo "Starting cow xyzPar"
+	./$(name) -f $(smf_file) -x 4.75 -y -3.25 -z 3.3 -P > cow_xyzPar.pbm
+	@echo "Starting cow XYZ"
+	./$(name) -f $(smf_file) -X 0.25 -Y -0.15 -Z 0.3 > cow_XYZ.pbm
+	@echo "Starting cow XYZuvP"
+	./$(name) -f $(smf_file) -X 0.35 -Y -0.3 -Z 0.3 -u -0.35 -v -0.35 -P > cow_XYZuvP.pbm
+	@echo "Starting cow XYZjkop"
+	./$(name) -f $(smf_file) -X 0.25 -Y -0.15 -Z 0.3 -j 103 -k 143 -o 421 -p 379 > cow_XYZjkop.pbm
+	@echo "Starting cow XYZuvjkopP"
+	./$(name) -f $(smf_file) -X 0.35 -Y -0.3 -Z 0.3 -u -0.35 -v -0.35 -j 43 -k 71 -o 201 -p 402 -P > cow_XYZuvjkopP.pbm
+	@echo "Starting cow qrw"
+	./$(name) -f $(smf_file) -q -1 -r 1.5 -w -2.0 > cow_q_r_w.pbm
+	@echo "Starting cow QRW"
+	./$(name) -f $(smf_file) -Q 1.5 -R 1 -W .4 > cow_QRW.pbm
+	@echo "Starting cow uvUV"
+	./$(name) -f $(smf_file) -u -1.5 -v -0.9 -U 1.2 -V 0.7 > cow_uvUV.pbm
 
 clean:
 	-rm -r *.pbm
