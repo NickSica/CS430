@@ -9,15 +9,15 @@ build: main.cpp draw.cpp
 
 test: build
 	@echo "Starting default"
-	./$(name) > out.pbm
+	./$(name) > default.pbm
 	@echo "Starting circle 1"
-	./$(name) -f $(smf_file) -x -1.0 -z 0.5 -q 1.0 -w -0.5 > out.pbm
+	./$(name) -f $(smf_file) -x -1.0 -z 0.5 -q 1.0 -w -0.5 > circle_1.pbm
 	@echo "Starting circle 2"
-	./$(name) -f $(smf_file) -q 1.0 -w -1.0 > out.pbm
+	./$(name) -f $(smf_file) -q 1.0 -w -1.0 > circle_2.pbm
 	@echo "Starting circle 3"
-	./$(name) -f $(smf_file) -x -4.0 -z 5.0 -q 1.0 -w -0.5 > out.pbm
+	./$(name) -f $(smf_file) -x -4.0 -z 5.0 -q 1.0 -w -0.5 > circle_3.pbm
 	@echo "Starting circle 4"
-	./$(name) -f $(smf_file) -k 125 -p 375 -q 1.0 -u -1.4 -U 1.4 > out.pbm
+	./$(name) -f $(smf_file) -k 125 -p 375 -q 1.0 -u -1.4 -U 1.4 > circle_4.pbm
 	@echo "Switching to bunny"
 	$(eval smf_file=bound-bunny_200.smf)
 	@echo "Starting bunny f"
