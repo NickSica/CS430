@@ -380,6 +380,21 @@ bool trivialReject(coordinate *cmd_parts, int length, int par_proj, int z_min, i
 	return 1;
 }
 
+void checkPoint(coordinate *coord, bounds *x_bounds, bounds *y_bounds)
+{
+	if(coord->x > x_bounds->upper || coord->x < x_bounds->lower)
+	{
+		std::cerr << "ERROR: Coordinate is outside bounds " << x_bounds->lower << ", " << x_bounds->upper << '\n';
+		std::cerr << "Coordinate is (" << coord->x << ", " << coord->y << ")\n";
+	}
+
+	if(coord->y > y_bounds->upper || coord->y < y_bounds->lower)
+	{
+		std::cerr << "ERROR: Coordinate is outside bounds " << x_bounds->lower << ", " << x_bounds->upper << '\n';
+		std::cerr << "Coordinate is (" << coord->x << ", " << coord->y << ")\n";
+	}
+}
+
 // Uses DDA algorithm to scan convert lines
 void scanConversion(float *cmd_parts, std::vector<std::vector<uint8_t>> *pixels, bounds *x_bounds, bounds *y_bounds)
 {
@@ -423,6 +438,8 @@ void scanConversion(float *cmd_parts, std::vector<std::vector<uint8_t>> *pixels,
 		float y = y1;
 		for(float x = x1; x < x2; ++x)
 		{
+			coordinate coord{ x, y, 0 };
+			checkPoint(&coord, x_bounds, y_bounds);
 			(*pixels)[round(y)][round(x)] = 1;
 			y += m;
 		}
@@ -432,6 +449,8 @@ void scanConversion(float *cmd_parts, std::vector<std::vector<uint8_t>> *pixels,
 		float x = x1;
 		for(float y = y1; y < y2; ++y)
 		{
+			coordinate coord{ x, y, 0 };
+			checkPoint(&coord, x_bounds, y_bounds);
 			(*pixels)[round(y)][round(x)] = 1;
 			x += m;
 		}

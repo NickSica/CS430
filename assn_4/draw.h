@@ -72,6 +72,7 @@ int clipLine(float *, bounds *, bounds *);
 void clipPolygon(std::vector<coordinate> *, bounds *, bounds *);
 void fillPolygon(std::vector<std::vector<uint8_t>> *, std::vector<coordinate> *, bounds *, bounds *);
 bool trivialReject(coordinate *, int, int, int, int);
+void checkPoint(coordinate *, bounds *, bounds *);
 void scanConversion(float *, std::vector<std::vector<uint8_t>> *, bounds *, bounds *);
 
 #endif

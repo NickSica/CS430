@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
 	size_t y = (size_t)(args.vw_y_upper_bound + 1);
 
 	std::vector<std::vector<uint8_t>> pixels{ y, std::vector<uint8_t>( x ) };
-	parsePSFile(&args, &pixels);
+	parseSMFFile(&args, &pixels);
 	printPBM(&pixels);
 	return 0;
 }
@@ -109,7 +109,7 @@ static error_t parse_opts(int key, char *arg_char, argp_state *state)
 		break;
 
 	case 'P':
-		args->parallel_proj = stof(arg);
+		args->parallel_proj = true;
 		break;
 
 	case ARGP_KEY_ARG:
@@ -123,7 +123,7 @@ static error_t parse_opts(int key, char *arg_char, argp_state *state)
 	return 0;
 }
 
-void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
+void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 {
 	std::cerr << "Parsing file " << args->smf_file << "\n";
 	const std::string WHITESPACE = " \t\r\n\f\v";
@@ -222,14 +222,28 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 					}
 				}
 
+				bounds window_x_bounds;
+				bounds window_y_bounds;
+				if(args->parallel_proj)
+				{
+					window_x_bounds = { -1, 1 };
+					window_y_bounds = { -1, 1 };
+				}
+				else
+				{
+					float abs_z_proj = std::abs(z_proj);
+					window_x_bounds = { -abs_z_proj, abs_z_proj };
+					window_y_bounds = { -abs_z_proj, abs_z_proj };
+				}
+
 				// Line drawing
 				for(int i = 0; i < length - 1; i++)
 				{
 					float cmd_parts[4]{ face[i].x, face[i].y, face[i + 1].x, face[i + 1].y };
-					int draw_line{ clipLine(&cmd_parts[0], &ww_x_bounds, &ww_y_bounds) };
+					int draw_line{ clipLine(&cmd_parts[0], &window_x_bounds, &window_y_bounds) };
 					coordinate coords[2]{ {cmd_parts[0], cmd_parts[1]}, {cmd_parts[2], cmd_parts[3]} };
 					for(int i = 0; i < length; ++i)
-					worldToViewport(&face[i], args);
+						worldToViewport(&face[i], args);
 					cmd_parts[0] = coords[0].x;
 					cmd_parts[1] = coords[0].y;
 					cmd_parts[2] = coords[1].x;
