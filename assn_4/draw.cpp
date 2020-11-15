@@ -1,25 +1,5 @@
 #include "draw.h"
 
-void worldToViewport(coordinate *coord, arguments *args, bounds *ww_x_bounds, bounds *ww_y_bounds)
-{
-	float x_scale = (float)(args->vw_x_upper_bound - args->vw_x_lower_bound) / (float)(ww_x_bounds->upper - ww_x_bounds->lower);
-	float y_scale = (float)(args->vw_y_upper_bound - args->vw_y_lower_bound) / (float)(ww_y_bounds->upper - ww_y_bounds->lower);
-	float scaling_factors[3] { x_scale, y_scale, 1.0 };
-	// First translate to origin
-	coordinate tran_coord{ -ww_x_bounds->lower, -ww_y_bounds->lower, 0 };
-	translateCoord(coord, &tran_coord);
-
-	// Second scale to viewport size
-	scaleCoord(coord, scaling_factors);
-
-	// Third translate to final position
-	tran_coord = {
-		.x = (float)args->vw_x_lower_bound,
-		.y = (float)args->vw_y_lower_bound,
-		.z = 0 };
-	translateCoord(coord, &tran_coord);
-}
-
 // Quick and dirty dot product
 void dotProduct(float *mat1, float *mat2, float *result, int m1_rows, int m1_cols, int m2_cols)
 {
@@ -134,25 +114,6 @@ void normalize(coordinate *coord, arguments *args)
 	coord->z = new_coord[2][0];
 }
 
-void shearCoord(coordinate *coord, arguments *args, coordinate *x_shear, coordinate *y_shear, coordinate *z_shear)
-{
-	coord->x = coord->x + x_shear->y * coord->y + x_shear->z * coord->z;
-	coord->x = y_shear->x * coord->x + coord->y + y_shear->z * coord->z;
-	coord->x = z_shear->x * coord->x + z_shear->y * coord->y + coord->z;
-}
-
-void scaleCoord(coordinate *coord, float *scaling_factors)
-{
-	if(scaling_factors[0] != 1.0)
-		coord->x = coord->x * scaling_factors[0];
-
-	if(scaling_factors[1] != 1.0)
-		coord->y = coord->y * scaling_factors[1];
-
-	if(scaling_factors[0] != 1.0)
-		coord->z = coord->z * scaling_factors[2];
-}
-
 void rotateViewplane(coordinate *rot_x, coordinate *rot_y, coordinate *rot_z, arguments *args)
 {
 	float x_2 = std::pow(args->vpn_x, 2);
@@ -196,13 +157,45 @@ void rotateViewplane(coordinate *rot_x, coordinate *rot_y, coordinate *rot_z, ar
 	rot_y->x = rot_z->y * rot_x->z - rot_z->z * rot_x->y;
 	rot_y->y = rot_z->z * rot_x->x - rot_z->x * rot_x->z;
 	rot_y->z = rot_z->x * rot_x->y - rot_z->y * rot_x->x;
+}
 
-	/*
-	coord[0] = { rot_x->x, rot_y->x, rot_z->x, 0 };
-	coord[1] = { rot_x->y, rot_y->y, rot_z->y, 0 };
-	coord[2] = { rot_x->z, rot_y->z, rot_z->z, 0 };
-	coord[3] = { 0, 0, 0, 1 };
-	*/
+void worldToViewport(coordinate *coord, arguments *args, bounds *ww_x_bounds, bounds *ww_y_bounds)
+{
+	float x_scale = (float)(args->vw_x_upper_bound - args->vw_x_lower_bound) / (float)(ww_x_bounds->upper - ww_x_bounds->lower);
+	float y_scale = (float)(args->vw_y_upper_bound - args->vw_y_lower_bound) / (float)(ww_y_bounds->upper - ww_y_bounds->lower);
+	float scaling_factors[3] { x_scale, y_scale, 1.0 };
+	// First translate to origin
+	coordinate tran_coord{ -ww_x_bounds->lower, -ww_y_bounds->lower, 0 };
+	translateCoord(coord, &tran_coord);
+
+	// Second scale to viewport size
+	scaleCoord(coord, scaling_factors);
+
+	// Third translate to final position
+	tran_coord = {
+		.x = (float)args->vw_x_lower_bound,
+		.y = (float)args->vw_y_lower_bound,
+		.z = 0 };
+	translateCoord(coord, &tran_coord);
+}
+
+void shearCoord(coordinate *coord, arguments *args, coordinate *x_shear, coordinate *y_shear, coordinate *z_shear)
+{
+	coord->x = coord->x + x_shear->y * coord->y + x_shear->z * coord->z;
+	coord->x = y_shear->x * coord->x + coord->y + y_shear->z * coord->z;
+	coord->x = z_shear->x * coord->x + z_shear->y * coord->y + coord->z;
+}
+
+void scaleCoord(coordinate *coord, float *scaling_factors)
+{
+	if(scaling_factors[0] != 1.0)
+		coord->x = coord->x * scaling_factors[0];
+
+	if(scaling_factors[1] != 1.0)
+		coord->y = coord->y * scaling_factors[1];
+
+	if(scaling_factors[0] != 1.0)
+		coord->z = coord->z * scaling_factors[2];
 }
 
 void translateCoord(coordinate *coord, coordinate *tran_coord)
@@ -278,141 +271,11 @@ int clipLine(float *cmd_parts, bounds *x_bounds, bounds *y_bounds)
 	return 1;
 }
 
-// Clip the polygon with Sutherland-Hodgman
-void clipPolygon(std::vector<coordinate> *vertices, bounds *x_bounds, bounds *y_bounds)
-{
-	std::cerr << "Polygon Clipping start" << '\n';
-	std::vector<coordinate> new_vertices(vertices->size() * 2);
-	bounds *bounds = x_bounds;
-
-	// Each loop iteration is another bound check- 0 checks against x lower, 1: x upper, 2: y lower, 3: x lower
-	for(int i = 0; i < 4; i++)
-	{
-		int idx{ 0 };
-		float x1{ (*vertices)[0].x };
-		float y1{ (*vertices)[0].y };
-		switch(i)
-		{
-		case 0:
-			if(x1 >= bounds->lower)
-			{
-				new_vertices[idx] = (*vertices)[0];
-				idx++;
-			}
-			break;
-		case 1:
-			if(x1 <= bounds->upper)
-			{
-				new_vertices[idx] = (*vertices)[0];
-				idx++;
-			}
-			break;
-		case 2:
-			if(y1 >= bounds->lower)
-			{
-				new_vertices[idx] = (*vertices)[0];
-				idx++;
-			}
-			break;
-		case 3:
-			if(y1 <= bounds->upper)
-			{
-				new_vertices[idx] = (*vertices)[0];
-				idx++;
-			}
-			break;
-		}
-
-		// Clip against x lower bound
-		for(int j = 0; j < vertices->size() - 1; ++j)
-		{
-			float x1{ (*vertices)[j].x };
-			float y1{ (*vertices)[j].y };
-			float x2{ (*vertices)[j + 1].x };
-			float y2{ (*vertices)[j + 1].y };
-
-			uint8_t v1_in;
-			uint8_t v2_in;
-			switch(i)
-			{
-			case 0:
-				v1_in = x1 >= bounds->lower;
-				v2_in = x2 >= bounds->lower;
-				break;
-			case 1:
-				v1_in = x1 <= bounds->upper;
-				v2_in = x2 <= bounds->upper;
-				break;
-			case 2:
-				v1_in = y1 >= bounds->lower;
-				v2_in = y2 >= bounds->lower;
-				break;
-			case 3:
-				v1_in = y1 <= bounds->upper;
-				v2_in = y2 <= bounds->upper;
-				break;
-			}
-
-			float xc{ i == 0 ? (float)bounds->lower : (float)bounds->upper };
-			float yc{ i == 2 ? (float)bounds->lower : (float)bounds->upper };
-			if(v1_in & v2_in)
-			{
-				new_vertices[idx] = { x2, y2 };
-				idx++;
-			}
-			else if(v1_in && !v2_in)
-			{
-				std::cerr << "Clipping (" << x2 << ", " << y2 << ")";
-				if(i < 2)
-				{
-					y2 = (y2 - y1) * (xc - x1) / (x2 - x1) + y1;
-					x2 = xc;
-				}
-				else
-				{
-					x2 = (x2 - x1) * (yc - y1) / (y2 - y1)	+ x1;
-					y2 = yc;
-				}
-				new_vertices[idx] = { x2, y2 };
-				idx++;
-			}
-			else if(!v1_in && v2_in)
-			{
-				std::cerr << "Clipping (" << x1 << ", " << y1 << ")";
-				if(i < 2)
-				{
-					y1 = (y1 - y2) * (xc - x2) / (x1 - x2) + y2;
-					x1 = xc;
-				}
-				else
-				{
-					x1 = (x1 - x2) * (yc - y2) / (y1 - y2)	+ x2;
-					y1 = yc;
-				}
-				new_vertices[idx] = { x1, y1 };
-				idx++;
-
-				new_vertices[idx] = { x2, y2 };
-				idx++;
-			}
-		}
-
-		// Copy changes over and reset everything
-		*vertices = new_vertices;
-		vertices->resize(idx);
-		vertices->push_back((*vertices)[0]);
-
-		if(i == 1)
-			bounds = y_bounds;
-	}
-}
-
-bool trivialReject(std::vector<coordinate> *face, int length, bool par_proj, int z_min, int z_proj)
+bool trivialReject(std::vector<coordinate> *face, int length, bool par_proj)
 {
 	std::cerr << "Trivial Reject start\n";
 	uint8_t codes[face->size()];
 	bounds xy_bounds{ -1, 1 };
-	bounds z_bounds{ -1, 0 };
 
 	for(int i = 0; i < face->size(); ++i)
 	{
@@ -426,9 +289,6 @@ bool trivialReject(std::vector<coordinate> *face, int length, bool par_proj, int
 		if((*face)[i].x > xy_bounds.upper) codes[i] |= 0b000010;
 		if((*face)[i].y < xy_bounds.lower) codes[i] |= 0b000100;
 		if((*face)[i].y > xy_bounds.upper) codes[i] |= 0b001000;
-
-		//if((*face)[i].z < z_bounds.lower) codes[i] |= 0b010000;
-		//if((*face)[i].z > z_bounds.upper) codes[i] |= 0b100000;
 	}
 
 	uint8_t final_code{ 0b111111 };
@@ -496,8 +356,8 @@ void scanConversion(float *cmd_parts, std::vector<std::vector<uint8_t>> *pixels,
 	}
 
 	std::cerr << "m=" << m << " dx=" << dx << " dy=" << dy << "\n";
-	std::cerr << "Start: (" << x1 << ", " << y1 << ")\n";
-	std::cerr << "End: (" << x2 << ", " << y2 << ")\n";
+	//std::cerr << "Start: (" << x1 << ", " << y1 << ")\n";
+	//std::cerr << "End: (" << x2 << ", " << y2 << ")\n";
 	if(dx == 1)
 	{
 		float y = y1;
@@ -505,7 +365,7 @@ void scanConversion(float *cmd_parts, std::vector<std::vector<uint8_t>> *pixels,
 		{
 			coordinate coord{ x, y, 0 };
 			checkPoint(&coord, x_bounds, y_bounds);
-			std::cerr << "Coordinate: " << round(x) << ", " << round(y) << '\n';
+			//std::cerr << "Coordinate: " << round(x) << ", " << round(y) << '\n';
 			(*pixels)[round(y)][round(x)] = 1;
 			y += m;
 		}

@@ -74,7 +74,7 @@ void translateCoord(coordinate *, coordinate *);
 int clipLine(float *, bounds *, bounds *);
 void clipPolygon(std::vector<coordinate> *, bounds *, bounds *);
 void fillPolygon(std::vector<std::vector<uint8_t>> *, std::vector<coordinate> *, bounds *, bounds *);
-bool trivialReject(std::vector<coordinate> *, int, bool, int, int);
+bool trivialReject(std::vector<coordinate> *, int, bool);
 void checkPoint(coordinate *, bounds *, bounds *);
 void scanConversion(float *, std::vector<std::vector<uint8_t>> *, bounds *, bounds *);
 

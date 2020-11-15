@@ -137,8 +137,6 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 {
 	std::cerr << "Parsing file " << args->smf_file << "\n";
 	const std::string WHITESPACE = " \t\r\n\f\v";
-	bounds ww_x_bounds{ args->u_min, args->u_max };
-	bounds ww_y_bounds{ args->v_min, args->v_max };
 	bounds vw_x_bounds{ (float)args->vw_x_lower_bound, (float)args->vw_x_upper_bound };
 	bounds vw_y_bounds{ (float)args->vw_y_lower_bound, (float)args->vw_y_upper_bound };
 
@@ -146,7 +144,6 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 	bool cmd_block{ false };
 	std::ifstream smf_file{ args->smf_file };
 	std::vector<coordinate> vertices;
-	std::vector<std::vector<coordinate>> faces;
 	while(std::getline(smf_file, line))
 	{
 		std::cerr << line << "\n";
@@ -163,11 +160,6 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 				{
 					int num_vertices = stoi(line.substr(line.rfind(' ')));
 					vertices.reserve(num_vertices);
-				}
-				else if (config_cmd == "faces")
-				{
-					int num_faces = stoi(line.substr(line.rfind(' ')));
-					faces.reserve(num_faces);
 				}
 			}
 			continue;
@@ -215,7 +207,7 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 
 				float z_min = (args->prp_z - args->clip_front) / (args->clip_back - args->prp_z);
 				float z_proj = (args->prp_z) / (args->clip_back - args->prp_z);
-				if(!trivialReject(&face, length, args->parallel_proj, z_min, std::abs(z_proj)))
+				if(!trivialReject(&face, length, args->parallel_proj))
 					continue;
 
 				for(int i = 0; i < length; ++i)
