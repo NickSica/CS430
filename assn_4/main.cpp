@@ -5,8 +5,8 @@ int main(int argc, char *argv[])
 	arguments args;
 	argp_parse(&argp, argc, argv, 0, 0, &args);
 
-	size_t x = (size_t)(args.vw_x_upper_bound + 1);
-	size_t y = (size_t)(args.vw_y_upper_bound + 1);
+	size_t x = (size_t)(args.x_res);
+	size_t y = (size_t)(args.y_res);
 
 	std::vector<std::vector<uint8_t>> pixels{ y, std::vector<uint8_t>( x ) };
 	parseSMFFile(&args, &pixels);

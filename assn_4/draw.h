@@ -14,6 +14,9 @@ struct arguments {
 	int vw_y_lower_bound{ 0 }; // -k
 	int vw_x_upper_bound{ 500 }; // -o
 	int vw_y_upper_bound{ 500 }; // -p
+	int x_res{ 501 };
+	int y_res{ 501 };
+
 	float prp_x{ 0.0 }; // -x
 	float prp_y{ 0.0 }; // -y
 	float prp_z{ 1.0 }; // -z
