@@ -61,17 +61,17 @@ struct edge {
 };
 
 void applyTransformations(float *, int, arguments *);
-void worldToViewport(coordinate *, arguments *);
-void perspectiveNorm(coordinate *, arguments *);
-void parallelNorm(coordinate *, arguments *);
+void worldToViewport(coordinate *, arguments *, bounds *, bounds *);
+//void dotProduct(float *mat1, float *mat2, int m1_rows, int m2_cols);
+void normalize(coordinate *, arguments *);
 void shearCoord(coordinate *, arguments *, coordinate *, coordinate *, coordinate *);
 void scaleCoord(coordinate *, float *);
-void rotateViewplane(coordinate *, arguments *);
+void rotateViewplane(coordinate *, coordinate *, coordinate *, arguments *);
 void translateCoord(coordinate *, coordinate *);
 int clipLine(float *, bounds *, bounds *);
 void clipPolygon(std::vector<coordinate> *, bounds *, bounds *);
 void fillPolygon(std::vector<std::vector<uint8_t>> *, std::vector<coordinate> *, bounds *, bounds *);
-bool trivialReject(coordinate *, int, int, int, int);
+bool trivialReject(std::vector<coordinate> *, int, bool, int, int);
 void checkPoint(coordinate *, bounds *, bounds *);
 void scanConversion(float *, std::vector<std::vector<uint8_t>> *, bounds *, bounds *);
 

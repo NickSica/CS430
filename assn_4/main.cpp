@@ -16,16 +16,18 @@ int main(int argc, char *argv[])
 
 static error_t parse_opts(int key, char *arg_char, argp_state *state)
 {
-	if(arg_char == NULL)
+	if(arg_char == NULL && key != 'P')
 		return 0;
 
 	arguments *args = (arguments *)state->input;
-	std::string arg = arg_char;
+	std::string arg;
+	if(key != 'P')
+		arg = arg_char;
 
 	switch(key)
 	{
 	case 'f':
-		args->smf_file = arg_char;
+		args->smf_file = arg;
 		break;
 
 	case 'j':
@@ -112,6 +114,14 @@ static error_t parse_opts(int key, char *arg_char, argp_state *state)
 		args->parallel_proj = true;
 		break;
 
+	case 'F':
+		args->clip_front = stof(arg);
+		break;
+
+	case 'B':
+		args->clip_back = stof(arg);
+		break;
+
 	case ARGP_KEY_ARG:
 		if(state->arg_num > 9)
 			argp_usage(state);
@@ -183,42 +193,43 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 				vertex.y = stof(line_parts[1]);
 				vertex.z = stof(line_parts[2]);
 
-				if(args->parallel_proj)
-					parallelNorm(&vertex, args);
-				else
-					perspectiveNorm(&vertex, args);
+				normalize(&vertex, args);
 				vertices.push_back(vertex);
 			}
 			else if(cmd == "f")
 			{
+				length++;
 				std::vector<coordinate> face;
 				face.resize(length);
 				//coordinate face[length];
-				for (int i = 0; i < length; ++i)
+				for (int i = 0; i < length - 1; ++i)
 				{
 					int vert_idx = stoi(line_parts[i]) - 1;
 					face[i].x = vertices[vert_idx].x;
 					face[i].y = vertices[vert_idx].y;
 					face[i].z = vertices[vert_idx].z;
 				}
+				face[length - 1].x = face[0].x;
+				face[length - 1].y = face[0].y;
+				face[length - 1].z = face[0].z;
 
 				float z_min = (args->prp_z - args->clip_front) / (args->clip_back - args->prp_z);
 				float z_proj = (args->prp_z) / (args->clip_back - args->prp_z);
-				if(trivialReject(&face[0], length, args->parallel_proj, z_min, z_proj) == 0)
+				if(!trivialReject(&face, length, args->parallel_proj, z_min, std::abs(z_proj)))
 					continue;
 
 				for(int i = 0; i < length; ++i)
 				{
 					if (args->parallel_proj)
 					{
+						face[i].z = 0;
+					}
+					else
+					{
 						float z_d = face[i].z / z_proj;
 						face[i].x /= z_d;
 						face[i].y /= z_d;
 						face[i].z = z_proj;
-					}
-					else
-					{
-						face[i].z = 0;
 					}
 				}
 
@@ -240,30 +251,17 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 				for(int i = 0; i < length - 1; i++)
 				{
 					float cmd_parts[4]{ face[i].x, face[i].y, face[i + 1].x, face[i + 1].y };
-					int draw_line{ clipLine(&cmd_parts[0], &window_x_bounds, &window_y_bounds) };
+					int draw_line{ clipLine(&(cmd_parts[0]), &window_x_bounds, &window_y_bounds) };
 					coordinate coords[2]{ {cmd_parts[0], cmd_parts[1]}, {cmd_parts[2], cmd_parts[3]} };
-					for(int i = 0; i < length; ++i)
-						worldToViewport(&face[i], args);
+					for(int i = 0; i < 2; ++i)
+						worldToViewport(&(coords[i]), args, &window_x_bounds, &window_y_bounds);
 					cmd_parts[0] = coords[0].x;
 					cmd_parts[1] = coords[0].y;
 					cmd_parts[2] = coords[1].x;
 					cmd_parts[3] = coords[1].y;
-					if (draw_line)
+					if(draw_line)
 						scanConversion(&cmd_parts[0], pixels, &vw_x_bounds, &vw_y_bounds);
 				}
-
-				// Polygon drawing
-				/*
-				clipPolygon(&face, &ww_x_bounds, &ww_y_bounds);
-				int length = 2;
-				for(int i = 0; i < face.size() - 1; i++)
-				{
-					worldToViewport(&(face[i]), args);
-					float vertex_coords[4] = { face[i].x, face[i].y, face[i + 1].x, face[i + 1].y };
-					scanConversion(&vertex_coords[0], pixels, &vw_x_bounds, &vw_y_bounds);
-				}
-				*/
-				//fillPolygon(pixels, &vertices, &vw_x_bounds, &vw_y_bounds);
 			}
 		}
 	}
@@ -306,7 +304,7 @@ void printPBM(std::vector<std::vector<uint8_t>> *pixels)
 	{
 		std::string line;
 		for(int x = 0; x < x_size; ++x)
-			line += std::to_string((*pixels)[0][0]) + " ";
+			line += std::to_string((*pixels)[y][x]) + " ";
 		std::cout << line.substr(0, line.length() - 1) << "\n";
 	}
 }

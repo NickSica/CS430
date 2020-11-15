@@ -1,12 +1,12 @@
 #include "draw.h"
 
-void worldToViewport(coordinate *coord, arguments *args)
+void worldToViewport(coordinate *coord, arguments *args, bounds *ww_x_bounds, bounds *ww_y_bounds)
 {
-	float x_scale = (float)(args->vw_x_upper_bound - args->vw_x_lower_bound) / (float)(args->u_max - args->u_min);
-	float y_scale = (float)(args->vw_y_upper_bound - args->vw_y_lower_bound) / (float)(args->v_max - args->v_min);
-	float scaling_factors[2] { x_scale, y_scale };
+	float x_scale = (float)(args->vw_x_upper_bound - args->vw_x_lower_bound) / (float)(ww_x_bounds->upper - ww_x_bounds->lower);
+	float y_scale = (float)(args->vw_y_upper_bound - args->vw_y_lower_bound) / (float)(ww_y_bounds->upper - ww_y_bounds->lower);
+	float scaling_factors[3] { x_scale, y_scale, 1.0 };
 	// First translate to origin
-	coordinate tran_coord{ -args->u_min, -args->v_min, 0 };
+	coordinate tran_coord{ -ww_x_bounds->lower, -ww_y_bounds->lower, 0 };
 	translateCoord(coord, &tran_coord);
 
 	// Second scale to viewport size
@@ -20,55 +20,118 @@ void worldToViewport(coordinate *coord, arguments *args)
 	translateCoord(coord, &tran_coord);
 }
 
-void perspectiveNorm(coordinate *coord, arguments *args)
+// Quick and dirty dot product
+void dotProduct(float *mat1, float *mat2, float *result, int m1_rows, int m1_cols, int m2_cols)
 {
-	coordinate vrp_neg{ -args->vrp_x, -args->vrp_y, -args->vrp_z };
-	translateCoord(coord, &vrp_neg);
-
-	rotateViewplane(coord, args);
-
-	coordinate prp_neg{ -args->prp_x, -args->prp_y, -args->prp_z };
-	translateCoord(coord, &prp_neg);
-
-	float u_shear = (0.5 * (args->u_max + args->u_min) - args->prp_x) / args->prp_z;
-	float v_shear = (0.5 * (args->v_max + args->v_min) - args->prp_y) / args->prp_z;
-	coordinate x_shear{ 1, 0, u_shear };
-	coordinate y_shear{ 0, 1, v_shear };
-	coordinate z_shear{ 0, 0, 1 };
-	shearCoord(coord, args, &x_shear, &y_shear, &z_shear);
-
-	float u_diff = 1 / (args->u_max - args->u_min);
-	float v_diff = 1 / (args->v_max - args->v_min);
-	float prp_diff = 1 / (args->prp_z - args->clip_back);
-	float scaling_factors[3]{ 2 * args->prp_z * u_diff * prp_diff,
-		2 * args->prp_z * v_diff * prp_diff,
-		prp_diff };
-	scaleCoord(coord, scaling_factors);
+	for(int i = 0; i < m1_rows; ++i)
+	{
+		for (int j = 0; j < m2_cols; ++j)
+		{
+			float dot = 0;
+			for (int k = 0; k < m1_cols; ++k)
+				dot += *(mat1 + m1_cols * i + k) * *(mat2 + m2_cols * k + j);
+			*(result + m2_cols * i + j) = dot;
+		}
+	}
 }
 
-void parallelNorm(coordinate *coord, arguments *args)
+void normalize(coordinate *coord, arguments *args)
 {
-	coordinate vrp_neg{ -args->vrp_x, -args->vrp_y, -args->vrp_z };
-	translateCoord(coord, &vrp_neg);
+	float norm_mat[4][4]{
+		{ 1, 0, 0, -args->vrp_x },
+		{ 0, 1, 0, -args->vrp_y },
+		{ 0, 0, 1, -args->vrp_z },
+		{ 0, 0, 0, 1 }
+	};
 
-	rotateViewplane(coord, args);
+	float res_mat[4][4];
+	coordinate rot_x;
+	coordinate rot_y;
+	coordinate rot_z;
+	rotateViewplane(&rot_x, &rot_y, &rot_z, args);
+	float rot_mat[4][4]{
+		{ rot_x.x, rot_x.y, rot_x.z },
+		{ rot_y.x, rot_y.y, rot_y.z },
+		{ rot_z.x, rot_z.y, rot_z.z },
+		{0, 0, 0, 1},
+	};
+	dotProduct(&(rot_mat[0][0]), &(norm_mat[0][0]), &(res_mat[0][0]), 4, 4, 4);
 
-	float u_shear = (0.5 * (args->u_max + args->u_min) - args->prp_x) / args->prp_z;
-	float v_shear = (0.5 * (args->v_max + args->v_min) - args->prp_y) / args->prp_z;
-	coordinate x_shear{ 1, 0, u_shear };
-	coordinate y_shear{ 0, 1, v_shear };
-	coordinate z_shear{ 0, 0, 1 };
-	shearCoord(coord, args, &x_shear, &y_shear, &z_shear);
+	float u_shear;
+	float v_shear;
+	if(args->prp_z != 0)
+	{
+		u_shear = (0.5 * (args->u_max + args->u_min) - args->prp_x) / args->prp_z;
+		v_shear = (0.5 * (args->v_max + args->v_min) - args->prp_y) / args->prp_z;
+	}
+	else
+	{
+		u_shear = 0;
+		v_shear = 0;
+	}
+	float shear_mat[4][4]{
+		{ 1, 0, u_shear, 0 },
+		{ 0, 1, v_shear, 0 },
+		{ 0, 0, 1, 0 },
+		{ 0, 0, 0, 1 }
+	};
 
-	float x_tran{ -(args->u_max + args->u_min) / 2 };
-	float y_tran{ -(args->v_max + args->v_min) / 2 };
-	float z_tran{ -args->clip_front };
+	if(args->parallel_proj)
+	{
+		dotProduct(&(shear_mat[0][0]), &(res_mat[0][0]), &(norm_mat[0][0]), 4, 4, 4);
 
-	float x_scale{ 2 / (args->u_max - args->u_min) };
-	float y_scale{ 2 / (args->v_max - args->v_min) };
-	float z_scale{ 1 / (args->clip_front - args->clip_back) };
-	float scaling_factors[3] { x_scale, y_scale, z_scale };
-	scaleCoord(coord, scaling_factors);
+		float tran_mat[4][4]{
+			{ 1, 0, 0, -(args->u_max + args->u_min) / 2 },
+			{ 0, 1, 0, -(args->v_max + args->v_min) / 2 },
+			{ 0, 0, 1, -args->clip_front },
+			{ 0, 0, 0, 1 }
+		};
+		dotProduct(&(tran_mat[0][0]), &(norm_mat[0][0]), &(res_mat[0][0]), 4, 4, 4);
+
+		float scale_mat[4][4]{
+			{ 2 / (args->u_max - args->u_min), 0, 0, 0 },
+			{ 0, 2 / (args->v_max - args->v_min), 0, 0 },
+			{ 0, 0, 1 / (args->clip_front - args->clip_back), 0 },
+			{ 0, 0, 0, 1 }
+		};
+		dotProduct(&(scale_mat[0][0]), &(res_mat[0][0]), &(norm_mat[0][0]), 4, 4, 4);
+	}
+	else
+	{
+		float tran_mat[4][4]{
+			{ 1, 0, 0, -args->prp_x },
+			{ 0, 1, 0, -args->prp_y },
+			{ 0, 0, 1, -args->prp_z },
+			{ 0, 0, 0, 1 }
+		};
+		dotProduct(&(tran_mat[0][0]), &(res_mat[0][0]), &(norm_mat[0][0]), 4, 4, 4);
+		dotProduct(&(shear_mat[0][0]), &(norm_mat[0][0]), &(res_mat[0][0]), 4, 4, 4);
+
+		float u_diff = 1 / (args->u_max - args->u_min);
+		float v_diff = 1 / (args->v_max - args->v_min);
+		float prp_diff = args->prp_z - args->clip_back;
+		if(prp_diff != 0)
+			prp_diff = 1 / prp_diff;
+		float scale_mat[4][4]{
+			{ 2 * args->prp_z * u_diff * prp_diff, 0, 0, 0 },
+			{ 0, 2 * args->prp_z * v_diff * prp_diff, 0, 0 },
+			{ 0, 0, prp_diff, 0 },
+			{ 0, 0, 0, 1 }
+		};
+		dotProduct(&(scale_mat[0][0]), &(res_mat[0][0]), &(norm_mat[0][0]), 4, 4, 4);
+	}
+
+	float old_coord[4][1]{
+		{ coord->x },
+		{ coord->y },
+		{ coord->z },
+		{ 1 }
+	};
+	float new_coord[4][1];
+	dotProduct(&(norm_mat[0][0]), &(old_coord[0][0]), &(new_coord[0][0]), 4, 4, 1);
+	coord->x = new_coord[0][0];
+	coord->y = new_coord[1][0];
+	coord->z = new_coord[2][0];
 }
 
 void shearCoord(coordinate *coord, arguments *args, coordinate *x_shear, coordinate *y_shear, coordinate *z_shear)
@@ -90,56 +153,56 @@ void scaleCoord(coordinate *coord, float *scaling_factors)
 		coord->z = coord->z * scaling_factors[2];
 }
 
-void rotateViewplane(coordinate *coord, arguments *args)
+void rotateViewplane(coordinate *rot_x, coordinate *rot_y, coordinate *rot_z, arguments *args)
 {
-	coordinate rot_x;
-	coordinate rot_y;
-	coordinate rot_z;
-	if(args->vpn_x != 0)
-		rot_z.x = args->vpn_x / std::abs(args->vpn_x);
+	float x_2 = std::pow(args->vpn_x, 2);
+	float y_2 = std::pow(args->vpn_y, 2);
+	float z_2 = std::pow(args->vpn_z, 2);
+	float norm = std::sqrt(x_2 + y_2 + z_2);
+	if(norm != 0)
+	{
+		rot_z->x = args->vpn_x / norm;
+		rot_z->y = args->vpn_y / norm;
+		rot_z->z = args->vpn_z / norm;
+	}
 	else
-		rot_z.x = 0;
+	{
+		rot_z->x = 0;
+		rot_z->y = 0;
+		rot_z->z = 0;
+	}
 
-	if(args->vpn_y != 0)
-		rot_z.y = args->vpn_y / std::abs(args->vpn_y);
+	float x_cross = args->vup_y * rot_z->z - args->vup_z * rot_z->y;
+	float y_cross = args->vup_z * rot_z->x - args->vup_x * rot_z->z;
+	float z_cross = args->vup_x * rot_z->y - args->vup_y * rot_z->x;
+	x_2 = std::pow(x_cross, 2);
+	y_2 = std::pow(y_cross, 2);
+	z_2 = std::pow(z_cross, 2);
+	norm = std::sqrt(x_2 + y_2 + z_2);
+
+	if(norm != 0)
+	{
+		rot_x->x = x_cross / norm;
+		rot_x->y = y_cross / norm;
+		rot_x->z = z_cross / norm;
+	}
 	else
-		rot_z.y = 0;
+	{
+		rot_x->x = 0;
+		rot_x->y = 0;
+		rot_x->z = 0;
+	}
 
-	if(args->vpn_z != 0)
-		rot_z.z = args->vpn_z / std::abs(args->vpn_z);
-	else
-		rot_z.z = 0;
+	rot_y->x = rot_z->y * rot_x->z - rot_z->z * rot_x->y;
+	rot_y->y = rot_z->z * rot_x->x - rot_z->x * rot_x->z;
+	rot_y->z = rot_z->x * rot_x->y - rot_z->y * rot_x->x;
 
-	float x_cross = args->vup_y * rot_z.z - args->vup_z * rot_z.y;
-	float y_cross = args->vup_z * rot_z.x - args->vup_x * rot_z.z;
-	float z_cross = args->vup_x * rot_z.y - args->vup_y * rot_z.x;
-
-	if(x_cross != 0)
-		rot_x.x = x_cross / std::abs(x_cross);
-	else
-		rot_x.x = 0;
-
-	if(y_cross != 0)
-		rot_x.y = y_cross / std::abs(y_cross);
-	else
-		rot_x.y = 0;
-
-	if(z_cross != 0)
-		rot_x.z = z_cross / std::abs(z_cross);
-	else
-		rot_x.z = 0;
-
-	rot_y.x = rot_z.y * rot_x.z - rot_z.z * rot_x.y;
-	rot_y.y = rot_z.z * rot_x.x - rot_z.x * rot_x.z;
-	rot_y.z = rot_z.x * rot_x.y - rot_z.y * rot_x.x;
-
-	float x = coord->x;
-	float y = coord->y;
-	float z = coord->z;
-
-	coord->x = rot_x.x * x + rot_x.y * y + rot_x.z * z;
-	coord->y = rot_y.x * x + rot_y.y * y + rot_y.z * z;
-	coord->z = rot_z.x * x + rot_z.y * y + rot_z.z * z;
+	/*
+	coord[0] = { rot_x->x, rot_y->x, rot_z->x, 0 };
+	coord[1] = { rot_x->y, rot_y->y, rot_z->y, 0 };
+	coord[2] = { rot_x->z, rot_y->z, rot_z->z, 0 };
+	coord[3] = { 0, 0, 0, 1 };
+	*/
 }
 
 void translateCoord(coordinate *coord, coordinate *tran_coord)
@@ -344,40 +407,40 @@ void clipPolygon(std::vector<coordinate> *vertices, bounds *x_bounds, bounds *y_
 	}
 }
 
-bool trivialReject(coordinate *cmd_parts, int length, int par_proj, int z_min, int z_proj)
+bool trivialReject(std::vector<coordinate> *face, int length, bool par_proj, int z_min, int z_proj)
 {
 	std::cerr << "Trivial Reject start\n";
-	uint8_t codes[3];
-	bounds x_bounds{ -1, 1 };
-	bounds y_bounds{ -1, 1 };
+	uint8_t codes[face->size()];
+	bounds xy_bounds{ -1, 1 };
 	bounds z_bounds{ -1, 0 };
-	if(!par_proj)
-	{
-		x_bounds.upper = -z_proj;
-		x_bounds.lower = z_proj;
-		y_bounds.upper = -z_proj;
-		y_bounds.lower = z_proj;
-		z_bounds.upper = z_min;
-		z_bounds.lower = -1;
-	}
 
-	for(int i = 0; i < length; i += 2)
+	for(int i = 0; i < face->size(); ++i)
 	{
 		codes[i] = 0;
-		if(cmd_parts[i].x < x_bounds.lower) codes[i] |= 0b000001;
-		if(cmd_parts[i].x > x_bounds.upper) codes[i] |= 0b000010;
-		if(cmd_parts[i].y < y_bounds.lower) codes[i] |= 0b000100;
-		if(cmd_parts[i].y > y_bounds.upper) codes[i] |= 0b001000;
-		if(cmd_parts[i].z < z_bounds.lower) codes[i] |= 0b010000;
-		if(cmd_parts[i].z > z_bounds.upper) codes[i] |= 0b100000;
+		if(!par_proj)
+		{
+			xy_bounds.lower = (*face)[i].z;
+			xy_bounds.upper = -(*face)[i].z;
+		}
+		if((*face)[i].x < xy_bounds.lower) codes[i] |= 0b000001;
+		if((*face)[i].x > xy_bounds.upper) codes[i] |= 0b000010;
+		if((*face)[i].y < xy_bounds.lower) codes[i] |= 0b000100;
+		if((*face)[i].y > xy_bounds.upper) codes[i] |= 0b001000;
+
+		//if((*face)[i].z < z_bounds.lower) codes[i] |= 0b010000;
+		//if((*face)[i].z > z_bounds.upper) codes[i] |= 0b100000;
 	}
 
+	uint8_t final_code{ 0b111111 };
+	for(int i = 0; i < face->size(); ++i)
+		final_code &= codes[i];
+
 	// Lie completely outside view window
-	if((codes[0] & codes[1] & codes[2]) != 0b0000)
-		return 0;
+	if(final_code != 0b0000)
+		return false;
 
 	// Lie completely inside view window
-	return 1;
+	return true;
 }
 
 void checkPoint(coordinate *coord, bounds *x_bounds, bounds *y_bounds)
@@ -433,6 +496,8 @@ void scanConversion(float *cmd_parts, std::vector<std::vector<uint8_t>> *pixels,
 	}
 
 	std::cerr << "m=" << m << " dx=" << dx << " dy=" << dy << "\n";
+	std::cerr << "Start: (" << x1 << ", " << y1 << ")\n";
+	std::cerr << "End: (" << x2 << ", " << y2 << ")\n";
 	if(dx == 1)
 	{
 		float y = y1;
@@ -440,6 +505,7 @@ void scanConversion(float *cmd_parts, std::vector<std::vector<uint8_t>> *pixels,
 		{
 			coordinate coord{ x, y, 0 };
 			checkPoint(&coord, x_bounds, y_bounds);
+			std::cerr << "Coordinate: " << round(x) << ", " << round(y) << '\n';
 			(*pixels)[round(y)][round(x)] = 1;
 			y += m;
 		}
