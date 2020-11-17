@@ -3,7 +3,7 @@
 // Apply scaling, rotation, and translation transformations
 void applyTransformations(float *coord, int length, arguments *args)
 {
-	for(int i  = 0; i < length; i += 2)
+	for(int i  = 0; i < length - 1; i += 2)
 	{
 		coordinate temp_coord{ coord[i], coord[i + 1] };
 		// Scale coordinates
@@ -21,7 +21,7 @@ void applyTransformations(float *coord, int length, arguments *args)
 	}
 }
 
-void worldToViewport(coordinate *coord, int length, arguments *args)
+void worldToViewport(coordinate *coord, arguments *args)
 {
 	float x_scale = (float)(args->vw_x_upper_bound - args->vw_x_lower_bound) / (float)(args->ww_x_upper_bound - args->ww_x_lower_bound);
 	float y_scale = (float)(args->vw_y_upper_bound - args->vw_y_lower_bound) / (float)(args->ww_y_upper_bound - args->ww_y_lower_bound);
@@ -323,6 +323,36 @@ void fillPolygon(std::vector<std::vector<uint8_t>> *pixels, std::vector<coordina
 				(*pixels)[i][j] = 1;
 		}
 	}
+}
+
+void computeBezier(std::vector<coordinate> *coords, coordinate *ctrl_pts, arguments *args)
+{
+	float incr = 1.0 / (float)args->num_segments;
+	coords->reserve(args->num_segments);
+	for(float i = 0; i < 1; i += incr)
+	{
+		float t_diff = 1 - i;
+		float t_diff_2 = t_diff * t_diff;
+		float t_diff_3 = t_diff_2 * t_diff;
+		float i_2 = i * i;
+		float i_3 = i_2 * i;
+
+		float p1_x = t_diff_3 * ctrl_pts[0].x;
+		float p2_x = 3 * i * t_diff_2 * ctrl_pts[1].x;
+		float p3_x = 3 * i_2 * t_diff * ctrl_pts[2].x;
+		float p4_x = i_3 * ctrl_pts[3].x;
+
+		float p1_y = t_diff_3 * ctrl_pts[0].y;
+		float p2_y = 3 * i * t_diff_2 * ctrl_pts[1].y;
+		float p3_y = 3 * i_2 * t_diff * ctrl_pts[2].y;
+		float p4_y = i_3 * ctrl_pts[3].y;
+
+		float x = p1_x + p2_x + p3_x + p4_x;
+		float y = p1_y + p2_y + p3_y + p4_y;
+		coords->push_back({ x, y });
+	}
+	coords->push_back({ ctrl_pts[3].x, ctrl_pts[3].y });
+	// (1-t)^3 * P1 + 3t(1 - t)^2 * P2 + 3t^2 * (1 - t) * P3 + t^3 * P4
 }
 
 // Uses DDA algorithm to scan convert lines

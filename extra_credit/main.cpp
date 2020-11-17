@@ -79,6 +79,10 @@ static error_t parse_opts(int key, char *arg_char, argp_state *state)
 		args->vw_y_upper_bound = stoi(arg);
 		break;
 
+	case 'N':
+		args->num_segments = stoi(arg);
+		break;
+
 	case ARGP_KEY_ARG:
 		if(state->arg_num > 9)
 			argp_usage(state);
@@ -99,35 +103,36 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 	bounds vw_x_bounds{ args->vw_x_lower_bound, args->vw_x_upper_bound };
 	bounds vw_y_bounds{ args->vw_y_lower_bound, args->vw_y_upper_bound };
 
-	std::string line;
+	std::string file_line;
+	Command cmd_type{ none };
 	bool cmd_block{ false };
 	std::ifstream ps_file{ args->pscript_file };
 	std::vector<coordinate> vertices;
-	while(std::getline(ps_file, line))
+	while(std::getline(ps_file, file_line))
 	{
-		std::cerr << line << "\n";
-		if(line.substr(0, 8) == "%%%BEGIN")
+		std::cerr << file_line << "\n";
+		if(file_line.substr(0, 8) == "%%%BEGIN")
 		{
 			cmd_block = true;
 			continue;
 		}
 
-		if(line.substr(0, 6) == "%%%END")
+		if(file_line.substr(0, 6) == "%%%END")
 		{
 			cmd_block = false;
 			continue;
 		}
 
 		// In the command block and it has more than just whitespace
-		if(cmd_block && line.find_first_not_of(WHITESPACE) != std::string::npos)
+		if(cmd_block && file_line.find_first_not_of(WHITESPACE) != std::string::npos)
 		{
 			// Trim right whitespace
-			while(isspace(line[line.length() - 1]))
-				line = line.substr(0, line.length() - 2);
+			while(isspace(file_line[file_line.length() - 1]))
+				file_line = file_line.substr(0, file_line.length() - 2);
 
 			std::string cmd;
-			if(line != "stroke")
-				cmd = line.substr(line.rfind(' ') + 1);
+			if(file_line != "stroke")
+				cmd = file_line.substr(file_line.rfind(' ') + 1);
 			else
 				cmd = "stroke";
 
@@ -136,7 +141,7 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 				int length = 4;
 				float cmd_parts[length];
 				std::string line_parts[length];
-				int split_success = splitLines(line, ' ', &line_parts[0], length);
+				int split_success = splitLines(file_line, ' ', &line_parts[0], length);
 				for(int i = 0; i < length; i++)
 					cmd_parts[i] = std::stoi(line_parts[i]);
 
@@ -147,13 +152,14 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 					for(int i = 0; i < length - 1; i += 2)
 					{
 						coordinate coord{ cmd_parts[i], cmd_parts[i + 1] };
-						worldToViewport(&coord, length / 2, args);
+						worldToViewport(&coord, args);
 						cmd_parts[i] = coord.x;
 						cmd_parts[i + 1] = coord.y;
 					}
 
 					scanConversion(&cmd_parts[0], pixels, &vw_x_bounds, &vw_y_bounds);
 				}
+
 			}
 			else if(cmd == "moveto")
 			{
@@ -161,35 +167,89 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 				vertices.clear();
 				float cmd_parts[length];
 				std::string line_parts[length];
-				int split_success = splitLines(line, ' ', &line_parts[0], length);
+				int split_success = splitLines(file_line, ' ', &line_parts[0], length);
 				for(int i = 0; i < length; i++)
 					cmd_parts[i] = std::stof(line_parts[i]);
 
 				applyTransformations(&cmd_parts[0], length, args);
 				coordinate vertex = { cmd_parts[0], cmd_parts[1] };
 				vertices.push_back(vertex);
+				cmd_type = none;
 			}
 			else if(cmd == "lineto")
 			{
 				int length = 2;
 				float cmd_parts[length];
 				std::string line_parts[length];
-				int split_success = splitLines(line, ' ', &line_parts[0], length);
-				for(int i = 0; i < length; i++)
+				int split_success = splitLines(file_line, ' ', &line_parts[0], length);
+				for(int i = 0; i < length; ++i)
 					cmd_parts[i] = std::stof(line_parts[i]);
 
 				applyTransformations(&cmd_parts[0], length, args);
 				coordinate vertex = { cmd_parts[0], cmd_parts[1] };
 				vertices.push_back(vertex);
+				if(cmd_type == line)
+					cmd_type = polygon;
+				else
+					cmd_type = line;
+			}
+			else if(cmd == "curveto")
+			{
+				int length = 6;
+				float cmd_parts[length];
+				std::string line_parts[length];
+				int split_success = splitLines(file_line, ' ', &line_parts[0], length);
+				for(int i = 0; i < length; ++i)
+					cmd_parts[i] = std::stof(line_parts[i]);
+
+				applyTransformations(&cmd_parts[0], length, args);
+				for(int i = 0; i < length - 1; i += 2)
+				{
+					coordinate vertex = { cmd_parts[i], cmd_parts[i + 1] };
+					vertices.push_back(vertex);
+				}
+				cmd_type = curve;
 			}
 			else if(cmd == "stroke")
 			{
-				clipPolygon(&vertices, &ww_x_bounds, &ww_y_bounds);
-				int length = 2;
-				for(int i = 0; i < vertices.size(); ++i)
-					worldToViewport(&(vertices[i]), length, args);
+				if(cmd_type == polygon)
+				{
+					clipPolygon(&vertices, &ww_x_bounds, &ww_y_bounds);
+					int length = 2;
+					for(int i = 0; i < vertices.size(); ++i)
+						worldToViewport(&(vertices[i]), args);
 
-				fillPolygon(pixels, &vertices, &vw_x_bounds, &vw_y_bounds);
+					fillPolygon(pixels, &vertices, &vw_x_bounds, &vw_y_bounds);
+				}
+				else if(cmd_type == curve)
+				{
+					int bez_pow{ 4 };
+					coordinate control_points[bez_pow];
+					for(int i = bez_pow - 1; i >= 0; --i)
+					{
+						control_points[i] = vertices.back();
+						vertices.pop_back();
+					}
+
+					computeBezier(&vertices, &control_points[0], args);
+					for(int i = 0; i < vertices.size() - 1; ++i)
+					{
+						float line_seg[]{ vertices[i].x, vertices[i].y, vertices[i + 1].x, vertices[i + 1].y };
+						int draw_line{ clipLine(&line_seg[0], &ww_x_bounds, &ww_y_bounds) };
+						if(draw_line)
+						{
+							for(int i = 0; i < 3; i += 2)
+							{
+								coordinate coord{ line_seg[i], line_seg[i + 1] };
+								worldToViewport(&coord, args);
+								line_seg[i] = coord.x;
+								line_seg[i + 1] = coord.y;
+							}
+
+							scanConversion(&line_seg[0], pixels, &vw_x_bounds, &vw_y_bounds);
+						}
+					}
+				}
 			}
 		}
 	}
