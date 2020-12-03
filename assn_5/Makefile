@@ -13,7 +13,7 @@ test: build
 	@echo "Starting cow b"
 	./$(name) -f bound-cow.smf -F 0.1 > hw5_b.ppm
 	@echo "Starting cow c"
-	./$(name) -f $(smf_file) -F 0.1 -B -0.18 > hw5_c.ppm
+	./$(name) -f bound-cow.smf -F 0.1 -B -0.18 > hw5_c.ppm
 	@echo "Starting d"
 	./$(name) -f bound-bunny_1k.smf -g bound-cow.smf -i bound-sprtrd.smf -u -.8 -U .8 -v -.8 -V .8 > hw5_d.ppm
 	@echo "Starting e"

@@ -63,7 +63,7 @@ void normalize(coordinate *coord, arguments *args)
 		float tran_mat[4][4]{
 			{ 1, 0, 0, -(args->u_max + args->u_min) / 2 },
 			{ 0, 1, 0, -(args->v_max + args->v_min) / 2 },
-			{ 0, 0, 1, -args->clip_front },
+			{ 0, 0, 1, -args->front_plane },
 			{ 0, 0, 0, 1 }
 		};
 		dotProduct(&(tran_mat[0][0]), &(norm_mat[0][0]), &(res_mat[0][0]), 4, 4, 4);
@@ -71,7 +71,7 @@ void normalize(coordinate *coord, arguments *args)
 		float scale_mat[4][4]{
 			{ 2 / (args->u_max - args->u_min), 0, 0, 0 },
 			{ 0, 2 / (args->v_max - args->v_min), 0, 0 },
-			{ 0, 0, 1 / (args->clip_front - args->clip_back), 0 },
+			{ 0, 0, 1 / (args->front_plane - args->back_plane), 0 },
 			{ 0, 0, 0, 1 }
 		};
 		dotProduct(&(scale_mat[0][0]), &(res_mat[0][0]), &(norm_mat[0][0]), 4, 4, 4);
@@ -89,7 +89,7 @@ void normalize(coordinate *coord, arguments *args)
 
 		float u_diff = 1 / (args->u_max - args->u_min);
 		float v_diff = 1 / (args->v_max - args->v_min);
-		float prp_diff = args->prp_z - args->clip_back;
+		float prp_diff = args->prp_z - args->back_plane;
 		if(prp_diff != 0)
 			prp_diff = 1 / prp_diff;
 		float scale_mat[4][4]{
@@ -205,104 +205,6 @@ void translateCoord(coordinate *coord, coordinate *tran_coord)
 	coord->z = coord->z + tran_coord->z;
 }
 
-// Uses Cohen-Sutherland algorithm to clip lines to world view, returns 1 if it should draw the line
-int clipLine(float *cmd_parts, bounds *x_bounds, bounds *y_bounds)
-{
-	std::cerr << "Line Clipping Algorithm start\n";
-	uint8_t codes[2] = { 0, 0 };
-
-	for(int i = 0; i < 4; i += 2)
-	{
-		if(cmd_parts[i]		< x_bounds->lower) codes[i >> 1] |= 0b0001;
-		if(cmd_parts[i]		> x_bounds->upper) codes[i >> 1] |= 0b0010;
-		if(cmd_parts[i + 1] < y_bounds->lower) codes[i >> 1] |= 0b0100;
-		if(cmd_parts[i + 1] > y_bounds->upper) codes[i >> 1] |= 0b1000;
-	}
-
-	// Clip until points can be trivially accepted or rejected
-	int point_idx = 0;
-	while((codes[0] | codes[1]) != 0b0000 && (codes[0] & codes[1]) == 0b0000)
-	{
-		float x1 = cmd_parts[0];
-		float y1 = cmd_parts[1];
-		float x2 = cmd_parts[2];
-		float y2 = cmd_parts[3];
-		int idx{ point_idx >> 1 };
-		if((codes[idx] & 0b0001) == 0b0001)
-		{
-			float xc = x_bounds->lower;
-			cmd_parts[point_idx] = xc;
-			cmd_parts[point_idx + 1] = (y2 - y1) * (xc - x1) / (x2 - x1) + y1;
-		}
-		else if((codes[idx] & 0b0010) == 0b0010)
-		{
-			float xc = x_bounds->upper;
-			cmd_parts[point_idx] = xc;
-			cmd_parts[point_idx + 1] = (y2 - y1) * (xc - x1) / (x2 - x1) + y1;
-		}
-		else if((codes[idx] & 0b0100) == 0b0100)
-		{
-			float yc = y_bounds->lower;
-			cmd_parts[point_idx] = (x2 - x1) * (yc - y1) / (y2 - y1)  + x1;
-			cmd_parts[point_idx + 1] = yc;
-		}
-		else if((codes[idx] & 0b1000) == 0b1000)
-		{
-			float yc = y_bounds->upper;
-			cmd_parts[point_idx] = (x2 - x1) * (yc - y1) / (y2 - y1) + x1;
-			cmd_parts[point_idx + 1] = yc;
-		}
-
-		codes[idx] = 0;
-		if(cmd_parts[point_idx]		< x_bounds->lower) codes[idx] |= 0b0001;
-		if(cmd_parts[point_idx]		> x_bounds->upper) codes[idx] |= 0b0010;
-		if(cmd_parts[point_idx + 1] < y_bounds->lower) codes[idx] |= 0b0100;
-		if(cmd_parts[point_idx + 1] > y_bounds->upper) codes[idx] |= 0b1000;
-
-		if(point_idx == 0) point_idx = 2;
-		else point_idx = 0;
-	}
-
-	// Lie completely outside view window
-	if((codes[0] & codes[1]) != 0b0000)
-		return 0;
-
-	// Lie completely inside view window
-	return 1;
-}
-
-bool trivialReject(std::vector<coordinate> *face, int length, bool par_proj)
-{
-	std::cerr << "Trivial Reject start\n";
-	uint8_t codes[face->size()];
-	bounds xy_bounds{ -1, 1 };
-
-	for(int i = 0; i < face->size(); ++i)
-	{
-		codes[i] = 0;
-		if(!par_proj)
-		{
-			xy_bounds.lower = (*face)[i].z;
-			xy_bounds.upper = -(*face)[i].z;
-		}
-		if((*face)[i].x < xy_bounds.lower) codes[i] |= 0b000001;
-		if((*face)[i].x > xy_bounds.upper) codes[i] |= 0b000010;
-		if((*face)[i].y < xy_bounds.lower) codes[i] |= 0b000100;
-		if((*face)[i].y > xy_bounds.upper) codes[i] |= 0b001000;
-	}
-
-	uint8_t final_code{ 0b111111 };
-	for(int i = 0; i < face->size(); ++i)
-		final_code &= codes[i];
-
-	// Lie completely outside view window
-	if(final_code != 0b0000)
-		return false;
-
-	// Lie completely inside view window
-	return true;
-}
-
 void checkPoint(coordinate *coord, bounds *x_bounds, bounds *y_bounds)
 {
 	if(coord->x > x_bounds->upper || coord->x < x_bounds->lower)
@@ -318,67 +220,151 @@ void checkPoint(coordinate *coord, bounds *x_bounds, bounds *y_bounds)
 	}
 }
 
-// Uses DDA algorithm to scan convert lines
-void scanConversion(float *cmd_parts, std::vector<std::vector<uint8_t>> *pixels, bounds *x_bounds, bounds *y_bounds)
+float interpolateZ(std::vector<coordinate> *vertices, scan_line *line_info, int x_p, int y_s)
 {
-	std::cerr << "DDA Algorithm start\n";
-	float x1{ cmd_parts[0] };
-	float y1{ cmd_parts[1] };
-	float x2{ cmd_parts[2] };
-	float y2{ cmd_parts[3] };
+	float y1{ line_info->edges[0].y };
+	float y2{ line_info->edges[1].y };
+	float y3{ line_info->edges[2].y };
+	float y4{ line_info->edges[3].y };
+	float z1{ line_info->edges[0].z };
+	float z2{ line_info->edges[1].z };
+	float z3{ line_info->edges[2].z };
+	float z4{ line_info->edges[3].z };
 
-	float dx{ x2 - x1 };
-	float dy{ y2 - y1 };
-	float m;
-	if(abs((int)dx) >= abs((int)dy))
+	float x_a = line_info->intersections[0];
+	float x_b = line_info->intersections[1];
+	float z_a{ 0 };
+	float z_b{ 0 };
+	float z_p{ 0 };
+	z_a = z1 - ((z1 - z2) * (y1 - y_s) / (y1 - y2));
+	z_b = z3 - ((z3 - z4) * (y3 - y_s) / (y3 - y4));
+	z_p = z_b - ((z_b - z_a) * (x_b - x_p) / (x_b - x_a));
+
+	return z_p;
+}
+
+void updateZBuff(std::vector<std::vector<z_buffer>> *z_buff, uint8_t color[3], float front_plane, float z_p, int x, int y)
+{
+	if(z_p < front_plane && z_p > (*z_buff)[y][x].z)
 	{
-		if(dx < 0)
-		{
-			std::swap(x1, x2);
-			std::swap(y1, y2);
-			dx = x2 - x1;
-			dy = y2 - y1;
-		}
-		m = dy / dx;
-		dx = 1;
+		(*z_buff)[y][x].z = z_p;
+		(*z_buff)[y][x].color.red = color[0];
+		(*z_buff)[y][x].color.green = color[1];
+		(*z_buff)[y][x].color.blue = color[2];
 	}
-	else
+}
+
+void fillTriangle(std::vector<std::vector<z_buffer>> *z_buff, std::vector<coordinate> *vertices,
+				 uint8_t def_col[3], float front_plane, arguments *args, bounds *x_bounds, bounds *y_bounds)
+{
+	std::cerr << "Polygon Fill Algorithm Started\n";
+	std::vector<scan_line> scan_lines;
+	scan_lines.resize(y_bounds->upper);
+
+	int poly_y_min = (int)std::round((*vertices)[0].y);
+	int poly_y_max = (int)std::round((*vertices)[0].y);
+	for(int i = 0; i < vertices->size() - 1; ++i)
 	{
-		if(dy < 0)
+		int x1{ (int)std::round((*vertices)[i].x) };
+		int y1{ (int)std::round((*vertices)[i].y) };
+		int x2{ (int)std::round((*vertices)[i + 1].x) };
+		int y2{ (int)std::round((*vertices)[i + 1].y) };
+
+		float f_x1{ (*vertices)[i].x };
+		float f_y1{ (*vertices)[i].y };
+		float f_x2{ (*vertices)[i + 1].x };
+		float f_y2{ (*vertices)[i + 1].y };
+		if(poly_y_max < y2)
+			poly_y_max = std::round(y2);
+
+		if(poly_y_min > y2)
+			poly_y_min = std::round(y2);
+
+		if (y1 > y2)
 		{
-			std::swap(x1, x2);
 			std::swap(y1, y2);
-			dx = x2 - x1;
-			dy = y2 - y1;
+			std::swap(x1, x2);
+			std::swap(f_y1, f_y2);
+			std::swap(f_x1, f_x2);
 		}
-		m = dx / dy;
-		dy = 1;
+
+		for(int j = y1; j < y2; ++j)
+		{
+			//std::cerr << "j is " << j << " Vertices are (" << x1 << ", " << y1 << ") and (" << x2 << ", " << y2 << ")\n";
+			if(y2 != y1)
+			{
+				int new_x = (int)std::round(x2 - (y2 - j) * (x2 - x1) / (float)(y2 - y1));
+				scan_lines[j].intersections.push_back(new_x);
+				scan_lines[j].edges.push_back((*vertices)[i]);
+				scan_lines[j].edges.push_back((*vertices)[i + 1]);
+			}
+		}
 	}
 
-	std::cerr << "m=" << m << " dx=" << dx << " dy=" << dy << "\n";
-	//std::cerr << "Start: (" << x1 << ", " << y1 << ")\n";
-	//std::cerr << "End: (" << x2 << ", " << y2 << ")\n";
-	if(dx == 1)
+	//std::cerr << "Max poly y is " << poly_y_max << " Min poly y is " << poly_y_min << '\n';
+	uint8_t color[3];
+	for(int i = 0; i < 3; ++i)
+		color[i] = def_col[i];
+
+	for(int i = poly_y_min; i < poly_y_max; ++i)
 	{
-		float y = y1;
-		for(float x = x1; x < x2; ++x)
+		if(scan_lines[i].intersections.empty())
+			continue;
+
+		if(scan_lines[i].intersections[0] > scan_lines[i].intersections[1])
 		{
-			coordinate coord{ x, y, 0 };
-			checkPoint(&coord, x_bounds, y_bounds);
-			//std::cerr << "Coordinate: " << round(x) << ", " << round(y) << '\n';
-			(*pixels)[round(y)][round(x)] = 1;
-			y += m;
+			float temp = scan_lines[i].intersections[0];
+			scan_lines[i].intersections[0] = scan_lines[i].intersections[1];
+			scan_lines[i].intersections[1] = temp;
+
+			coordinate temp_1 = scan_lines[i].edges[0];
+			coordinate temp_2 = scan_lines[i].edges[1];
+			scan_lines[i].edges[0] = scan_lines[i].edges[2];
+			scan_lines[i].edges[1] = scan_lines[i].edges[3];
+			scan_lines[i].edges[2] = temp_1;
+			scan_lines[i].edges[3] = temp_2;
 		}
-	}
-	else if(dy == 1)
-	{
-		float x = x1;
-		for(float y = y1; y < y2; ++y)
+
+		std::vector<int> intersections { scan_lines[i].intersections };
+		if(intersections.size() > 2)
+			std::cerr << "ERROR: More than 2 intersections in a triangle!";
+
+				int intersect_idx = 0;
+		uint8_t fill_val = 0;
+		for(int j = x_bounds->lower; j < x_bounds->upper; ++j)
 		{
-			coordinate coord{ x, y, 0 };
-			checkPoint(&coord, x_bounds, y_bounds);
-			(*pixels)[round(y)][round(x)] = 1;
-			x += m;
+			// Z interpolation and Depth Cueing
+			float z_p = interpolateZ(vertices, &scan_lines[i], j, i);
+			for(int i = 0; i < 3; i++)
+				color[i] = (uint8_t)(std::round(def_col[i] * (z_p + 1) / (front_plane + 1)));
+			if(intersect_idx < intersections.size() && j >= intersections[intersect_idx])
+			{
+				updateZBuff(z_buff, color, front_plane, z_p, j, i);
+				/*
+				if(j == 362 && i == 263)
+				{
+
+					for(int l = 0; l < vertices->size(); ++l)
+						std::cerr << "ERROR: (" << (*vertices)[l].x << ", " << (*vertices)[l].y << ", " << (*vertices)[l].z << ")\n";
+					std::cerr << "ITERATION " << i << " " << j << "\n";
+				}
+				*/
+				fill_val = ~fill_val;
+				++intersect_idx;
+			}
+
+			if(fill_val != 0)
+			{
+				updateZBuff(z_buff, color, front_plane, z_p, j, i);
+				/*
+				if(j == 362 && i == 263)
+				{
+					for(int l = 0; l < vertices->size(); ++l)
+						std::cerr << "ERROR: (" << (*vertices)[l].x << ", " << (*vertices)[l].y << ", " << (*vertices)[l].z << ")\n";
+					std::cerr << "ITERATION " << i << " " << j << "\n";
+				}
+				*/
+			}
 		}
 	}
 }

@@ -7,10 +7,25 @@ int main(int argc, char *argv[])
 
 	size_t x = (size_t)(args.x_res);
 	size_t y = (size_t)(args.y_res);
+	args.max_val = 20;//255;
 
-	std::vector<std::vector<uint8_t>> pixels{ y, std::vector<uint8_t>( x ) };
-	parseSMFFile(&args, &pixels);
-	printPBM(&pixels);
+	std::vector<std::vector<z_buffer>> z_buff( y, std::vector<z_buffer>( x ) );
+	for(int i = 0; i < y; ++i)
+		for(int j = 0; j < x; ++j)
+			z_buff[i][j].z = -1;
+
+	for(int i = 0; i < 3; ++i)
+	{
+		uint8_t color[3]{ 0, 0, 0 };
+		color[i] = args.max_val;
+
+		if(args.smf_files[i] == "")
+			continue;
+
+		parseSMFFile(&args, &z_buff, args.smf_files[i], color);
+	}
+
+	printPPM(&z_buff, args.max_val);
 	return 0;
 }
 
@@ -27,7 +42,15 @@ static error_t parse_opts(int key, char *arg_char, argp_state *state)
 	switch(key)
 	{
 	case 'f':
-		args->smf_file = arg;
+		args->smf_files[0] = arg;
+		break;
+
+	case 'g':
+		args->smf_files[1] = arg;
+		break;
+
+	case 'i':
+		args->smf_files[2] = arg;
 		break;
 
 	case 'j':
@@ -115,11 +138,11 @@ static error_t parse_opts(int key, char *arg_char, argp_state *state)
 		break;
 
 	case 'F':
-		args->clip_front = stof(arg);
+		args->front_plane = stof(arg);
 		break;
 
 	case 'B':
-		args->clip_back = stof(arg);
+		args->back_plane = stof(arg);
 		break;
 
 	case ARGP_KEY_ARG:
@@ -133,16 +156,16 @@ static error_t parse_opts(int key, char *arg_char, argp_state *state)
 	return 0;
 }
 
-void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
+void parseSMFFile(arguments *args, std::vector<std::vector<z_buffer>> *z_buff, std::string file_name, uint8_t color[3])
 {
-	std::cerr << "Parsing file " << args->smf_file << "\n";
+	std::cerr << "Parsing file " << file_name << "\n";
 	const std::string WHITESPACE = " \t\r\n\f\v";
 	bounds vw_x_bounds{ (float)args->vw_x_lower_bound, (float)args->vw_x_upper_bound };
 	bounds vw_y_bounds{ (float)args->vw_y_lower_bound, (float)args->vw_y_upper_bound };
 
+	std::ifstream smf_file{ file_name };
 	std::string line;
 	bool cmd_block{ false };
-	std::ifstream smf_file{ args->smf_file };
 	std::vector<coordinate> vertices;
 	while(std::getline(smf_file, line))
 	{
@@ -193,7 +216,6 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 				length++;
 				std::vector<coordinate> face;
 				face.resize(length);
-				//coordinate face[length];
 				for (int i = 0; i < length - 1; ++i)
 				{
 					int vert_idx = stoi(line_parts[i]) - 1;
@@ -205,23 +227,18 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 				face[length - 1].y = face[0].y;
 				face[length - 1].z = face[0].z;
 
-				float z_min = (args->prp_z - args->clip_front) / (args->clip_back - args->prp_z);
-				float z_proj = (args->prp_z) / (args->clip_back - args->prp_z);
-				if(!trivialReject(&face, length, args->parallel_proj))
-					continue;
+				float z_min{ (args->prp_z - args->front_plane) / (args->back_plane - args->prp_z) };
+				if(args->parallel_proj)
+					z_min = 0;
 
+				float z_proj{ (args->prp_z) / (args->back_plane - args->prp_z) };
 				for(int i = 0; i < length; ++i)
 				{
-					if (args->parallel_proj)
-					{
-						face[i].z = 0;
-					}
-					else
+					if(!args->parallel_proj)
 					{
 						float z_d = face[i].z / z_proj;
 						face[i].x /= z_d;
 						face[i].y /= z_d;
-						face[i].z = z_proj;
 					}
 				}
 
@@ -239,21 +256,13 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 					window_y_bounds = { -abs_z_proj, abs_z_proj };
 				}
 
-				// Line drawing
-				for(int i = 0; i < length - 1; i++)
-				{
-					float cmd_parts[4]{ face[i].x, face[i].y, face[i + 1].x, face[i + 1].y };
-					int draw_line{ clipLine(&(cmd_parts[0]), &window_x_bounds, &window_y_bounds) };
-					coordinate coords[2]{ {cmd_parts[0], cmd_parts[1]}, {cmd_parts[2], cmd_parts[3]} };
-					for(int i = 0; i < 2; ++i)
-						worldToViewport(&(coords[i]), args, &window_x_bounds, &window_y_bounds);
-					cmd_parts[0] = coords[0].x;
-					cmd_parts[1] = coords[0].y;
-					cmd_parts[2] = coords[1].x;
-					cmd_parts[3] = coords[1].y;
-					if(draw_line)
-						scanConversion(&cmd_parts[0], pixels, &vw_x_bounds, &vw_y_bounds);
-				}
+				for(int i = 0; i < face.size() - 1; ++i)
+					worldToViewport(&(face[i]), args, &window_x_bounds, &window_y_bounds);
+				face[face.size() - 1] = face[0];
+
+				//for(int i = 0; i < face.size(); ++i)
+				//	std::cerr << "(" << face[i].x << ", " << face[i].y << ", " << face[i].z << ")\n";
+				fillTriangle(z_buff, &face, color, z_min, args, &vw_x_bounds, &vw_y_bounds);
 			}
 		}
 	}
@@ -285,18 +294,34 @@ int splitLines(std::string line, char split_char, std::string *line_parts, int n
 	return 0;
 }
 
-void printPBM(std::vector<std::vector<uint8_t>> *pixels)
+void printPPM(std::vector<std::vector<z_buffer>> *z_buff, int max_val)
 {
 	std::cerr << "Printing PBM start" << '\n';
-	int x_size = (*pixels)[0].size();
-	int y_size = (*pixels).size();
+	int x_size = (*z_buff)[0].size();
+	int y_size = (*z_buff).size();
 
-	std::cout << "P1\n" << x_size << " " << y_size << "\n";
+	std::cout << "P3\n" << x_size << " " << y_size << "\n" << max_val << "\n";
+	int pad_len = std::to_string(max_val).length();
 	for(int y = y_size - 1; y >= 0; --y)
 	{
 		std::string line;
 		for(int x = 0; x < x_size; ++x)
-			line += std::to_string((*pixels)[y][x]) + " ";
-		std::cout << line.substr(0, line.length() - 1) << "\n";
+		{
+			rgb color{ (*z_buff)[y][x].color };
+			std::string col_string{ std::to_string(color.red) };
+			col_string.insert(col_string.begin(), pad_len - col_string.length(), ' ');
+			line += col_string;
+
+			pad_len++;
+			col_string = std::to_string(color.green);
+			col_string.insert(col_string.begin(), pad_len - col_string.length(), ' ');
+			line += col_string;
+
+			col_string = std::to_string(color.blue);
+			col_string.insert(col_string.begin(), pad_len - col_string.length(), ' ');
+			line += col_string + "   ";
+			pad_len--;
+		}
+		std::cout << line.substr(0, line.length() - 3) << "\n";
 	}
 }

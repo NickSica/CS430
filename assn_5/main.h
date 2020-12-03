@@ -2,6 +2,7 @@
 #define MAIN_H
 
 #include <iostream>
+#include <iomanip>
 #include <string>
 #include <argp.h>
 #include <fstream>
@@ -15,7 +16,9 @@ char doc[] = "";
 char args_doc[] = "";
 
 const argp_option options[] {
-	{0, 'f', "smf file", 0, "the input smf file"},
+	{0, 'f', "smf_file", 0, "the input smf file of the first model"},
+	{0, 'g', "smf_file", 0, "the input smf file of the second model"},
+	{0, 'i', "smf_file", 0, "the input smf file of the third model"},
 	{0, 'j', "x viewport lower bound", 0, "an integer lower bound in the x dimension of the viewport window"},
 	{0, 'k', "y viewport lower bound", 0, "an integer lower bound in the y dimension of the viewport window"},
 	{0, 'o', "x viewport upper bound", 0, "an integer upper bound in the x dimension of the viewport window"},
@@ -46,8 +49,8 @@ static error_t parse_opts(int, char *, argp_state *);
 
 struct argp argp { options, parse_opts, args_doc, doc };
 
-void parseSMFFile(arguments *, std::vector<std::vector<uint8_t>> *);
+void parseSMFFile(arguments *, std::vector<std::vector<z_buffer>> *, std::string, uint8_t [3]);
 int splitLines(std::string, char, std::string *, int);
-void printPBM(std::vector<std::vector<uint8_t>> *);
+void printPPM(std::vector<std::vector<z_buffer>> *, int);
 
 #endif

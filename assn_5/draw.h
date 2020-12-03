@@ -9,7 +9,8 @@
 #include <bitset>
 
 struct arguments {
-	std::string smf_file{ "bound-lo-sphere.smf" }; // -f
+	std::string smf_files[3]{ "bound-sprellpsd.smf", "", "" }; // -f -g -i
+
 	int vw_x_lower_bound{ 0 }; // -j
 	int vw_y_lower_bound{ 0 }; // -k
 	int vw_x_upper_bound{ 500 }; // -o
@@ -39,8 +40,21 @@ struct arguments {
 	float v_max{ 0.7 }; // -V
 	bool parallel_proj{ false }; // -P
 
-	float clip_front{ 0.6 }; // -F
-	float clip_back{ -0.6 }; // -B
+	float front_plane{ 0.6 }; // -F
+	float back_plane{ -0.6 }; // -B
+
+	uint8_t max_val;
+};
+
+struct rgb {
+	uint8_t red{ 0 };
+	uint8_t green{ 0 };
+	uint8_t blue{ 0 };
+};
+
+struct z_buffer {
+	float z;
+	rgb color;
 };
 
 struct bounds {
@@ -54,28 +68,22 @@ struct coordinate {
 	float z;
 };
 
-struct edge {
-	float x1;
-	float y1;
-	float z1;
-	float x2;
-	float y2;
-	float z2;
+struct scan_line {
+	std::vector<coordinate> edges;
+	std::vector<float> f_intersections;
+	std::vector<int> intersections;
 };
 
 void applyTransformations(float *, int, arguments *);
 void worldToViewport(coordinate *, arguments *, bounds *, bounds *);
-//void dotProduct(float *mat1, float *mat2, int m1_rows, int m2_cols);
+void dotProduct(float *, float *, float *, int, int, int);
 void normalize(coordinate *, arguments *);
 void shearCoord(coordinate *, arguments *, coordinate *, coordinate *, coordinate *);
 void scaleCoord(coordinate *, float *);
 void rotateViewplane(coordinate *, coordinate *, coordinate *, arguments *);
 void translateCoord(coordinate *, coordinate *);
-int clipLine(float *, bounds *, bounds *);
-void clipPolygon(std::vector<coordinate> *, bounds *, bounds *);
-void fillPolygon(std::vector<std::vector<uint8_t>> *, std::vector<coordinate> *, bounds *, bounds *);
-bool trivialReject(std::vector<coordinate> *, int, bool);
 void checkPoint(coordinate *, bounds *, bounds *);
-void scanConversion(float *, std::vector<std::vector<uint8_t>> *, bounds *, bounds *);
+void fillTriangle(std::vector<std::vector<z_buffer>> *, std::vector<coordinate> *,
+				 uint8_t [3], float, arguments *args, bounds *, bounds *);
 
 #endif
