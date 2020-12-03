@@ -212,16 +212,11 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 
 				for(int i = 0; i < length; ++i)
 				{
-					if (args->parallel_proj)
-					{
-						face[i].z = 0;
-					}
-					else
+					if (!args->parallel_proj)
 					{
 						float z_d = face[i].z / z_proj;
 						face[i].x /= z_d;
 						face[i].y /= z_d;
-						face[i].z = z_proj;
 					}
 				}
 
@@ -242,6 +237,10 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 				// Line drawing
 				for(int i = 0; i < length - 1; i++)
 				{
+					// Back-face culling
+					//if(face[i].z < 0)
+					//	continue;
+
 					float cmd_parts[4]{ face[i].x, face[i].y, face[i + 1].x, face[i + 1].y };
 					int draw_line{ clipLine(&(cmd_parts[0]), &window_x_bounds, &window_y_bounds) };
 					coordinate coords[2]{ {cmd_parts[0], cmd_parts[1]}, {cmd_parts[2], cmd_parts[3]} };
