@@ -5,7 +5,7 @@ smf_file = bound-lo-sphere.smf
 .PHONY = clean
 
 build: main.cpp draw.cpp
-	$(cc) $^ -g -o $(name)
+	$(cc) $^ -I/site/local/ -g -o $(name)
 
 test: build
 	@echo "Starting default"
