@@ -7,6 +7,8 @@
 #include <vector>
 #include <algorithm>
 #include <bitset>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 struct arguments {
 	std::string smf_files[3]{ "bound-sprellpsd.smf", "", "" }; // -f -g -i
@@ -76,11 +78,10 @@ struct scan_line {
 
 void applyTransformations(float *, int, arguments *);
 void worldToViewport(coordinate *, arguments *, bounds *, bounds *);
-void dotProduct(float *, float *, float *, int, int, int);
 void normalize(coordinate *, arguments *);
 void shearCoord(coordinate *, arguments *, coordinate *, coordinate *, coordinate *);
 void scaleCoord(coordinate *, float *);
-void rotateViewplane(coordinate *, coordinate *, coordinate *, arguments *);
+void rotateViewplane(Eigen::Matrix<float, 3, 1> *, Eigen::Matrix<float, 3, 1> *, Eigen::Matrix<float, 3, 1> *, arguments *);
 void translateCoord(coordinate *, coordinate *);
 void checkPoint(coordinate *, bounds *, bounds *);
 void fillTriangle(std::vector<std::vector<z_buffer>> *, std::vector<coordinate> *,

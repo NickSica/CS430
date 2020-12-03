@@ -1,41 +1,26 @@
 #include "draw.h"
 
-// Quick and dirty dot product
-void dotProduct(float *mat1, float *mat2, float *result, int m1_rows, int m1_cols, int m2_cols)
-{
-	for(int i = 0; i < m1_rows; ++i)
-	{
-		for (int j = 0; j < m2_cols; ++j)
-		{
-			float dot = 0;
-			for (int k = 0; k < m1_cols; ++k)
-				dot += *(mat1 + m1_cols * i + k) * *(mat2 + m2_cols * k + j);
-			*(result + m2_cols * i + j) = dot;
-		}
-	}
-}
-
 void normalize(coordinate *coord, arguments *args)
 {
-	float norm_mat[4][4]{
-		{ 1, 0, 0, -args->vrp_x },
-		{ 0, 1, 0, -args->vrp_y },
-		{ 0, 0, 1, -args->vrp_z },
-		{ 0, 0, 0, 1 }
-	};
+	Eigen::Matrix<float, 4, 4> norm_mat;
+	norm_mat <<
+		1, 0, 0, -args->vrp_x,
+		0, 1, 0, -args->vrp_y,
+		0, 0, 1, -args->vrp_z,
+		0, 0, 0, 1;
 
-	float res_mat[4][4];
-	coordinate rot_x;
-	coordinate rot_y;
-	coordinate rot_z;
+	Eigen::Matrix<float, 3, 1> rot_x;
+	Eigen::Matrix<float, 3, 1> rot_y;
+	Eigen::Matrix<float, 3, 1> rot_z;
 	rotateViewplane(&rot_x, &rot_y, &rot_z, args);
-	float rot_mat[4][4]{
-		{ rot_x.x, rot_x.y, rot_x.z },
-		{ rot_y.x, rot_y.y, rot_y.z },
-		{ rot_z.x, rot_z.y, rot_z.z },
-		{0, 0, 0, 1},
-	};
-	dotProduct(&(rot_mat[0][0]), &(norm_mat[0][0]), &(res_mat[0][0]), 4, 4, 4);
+	Eigen::Matrix<float, 4, 4> rot_mat;
+	rot_mat <<
+		rot_x[0], rot_x[1], rot_x[2], 0,
+		rot_y[0], rot_y[1], rot_y[2], 0,
+		rot_z[0], rot_z[1], rot_z[2], 0,
+		0, 0, 0, 1;
+	Eigen::Matrix<float, 4, 4> res_mat{ rot_mat * norm_mat };
+	norm_mat = res_mat;
 
 	float u_shear;
 	float v_shear;
@@ -49,114 +34,94 @@ void normalize(coordinate *coord, arguments *args)
 		u_shear = 0;
 		v_shear = 0;
 	}
-	float shear_mat[4][4]{
-		{ 1, 0, u_shear, 0 },
-		{ 0, 1, v_shear, 0 },
-		{ 0, 0, 1, 0 },
-		{ 0, 0, 0, 1 }
-	};
+	Eigen::Matrix<float, 4, 4> shear_mat;
+	shear_mat <<
+		1, 0, u_shear, 0,
+		0, 1, v_shear, 0,
+		0, 0, 1, 0,
+		0, 0, 0, 1;
 
 	if(args->parallel_proj)
 	{
-		dotProduct(&(shear_mat[0][0]), &(res_mat[0][0]), &(norm_mat[0][0]), 4, 4, 4);
+		res_mat << shear_mat * norm_mat;
+		norm_mat = res_mat;
 
-		float tran_mat[4][4]{
-			{ 1, 0, 0, -(args->u_max + args->u_min) / 2 },
-			{ 0, 1, 0, -(args->v_max + args->v_min) / 2 },
-			{ 0, 0, 1, -args->front_plane },
-			{ 0, 0, 0, 1 }
-		};
-		dotProduct(&(tran_mat[0][0]), &(norm_mat[0][0]), &(res_mat[0][0]), 4, 4, 4);
+		Eigen::Matrix<float, 4, 4> tran_mat;
+		tran_mat <<
+			1, 0, 0, -(args->u_max + args->u_min) / 2,
+			0, 1, 0, -(args->v_max + args->v_min) / 2,
+			0, 0, 1, -args->front_plane,
+			0, 0, 0, 1;
+		res_mat << tran_mat * norm_mat;
+		norm_mat = res_mat;
 
-		float scale_mat[4][4]{
-			{ 2 / (args->u_max - args->u_min), 0, 0, 0 },
-			{ 0, 2 / (args->v_max - args->v_min), 0, 0 },
-			{ 0, 0, 1 / (args->front_plane - args->back_plane), 0 },
-			{ 0, 0, 0, 1 }
-		};
-		dotProduct(&(scale_mat[0][0]), &(res_mat[0][0]), &(norm_mat[0][0]), 4, 4, 4);
+		Eigen::Matrix<float, 4, 4> scale_mat;
+		scale_mat <<
+			2 / (args->u_max - args->u_min), 0, 0, 0,
+			0, 2 / (args->v_max - args->v_min), 0, 0,
+			0, 0, 1 / (args->front_plane - args->back_plane), 0,
+			0, 0, 0, 1;
+		res_mat << scale_mat * norm_mat;
+		norm_mat = res_mat;
 	}
 	else
 	{
-		float tran_mat[4][4]{
-			{ 1, 0, 0, -args->prp_x },
-			{ 0, 1, 0, -args->prp_y },
-			{ 0, 0, 1, -args->prp_z },
-			{ 0, 0, 0, 1 }
-		};
-		dotProduct(&(tran_mat[0][0]), &(res_mat[0][0]), &(norm_mat[0][0]), 4, 4, 4);
-		dotProduct(&(shear_mat[0][0]), &(norm_mat[0][0]), &(res_mat[0][0]), 4, 4, 4);
+		Eigen::Matrix<float, 4, 4> tran_mat;
+		tran_mat <<
+			1, 0, 0, -args->prp_x,
+			0, 1, 0, -args->prp_y,
+			0, 0, 1, -args->prp_z,
+			0, 0, 0, 1;
+		res_mat << tran_mat * norm_mat;
+		norm_mat = res_mat;
+
+		res_mat << shear_mat * norm_mat;
+		norm_mat = res_mat;
 
 		float u_diff = 1 / (args->u_max - args->u_min);
 		float v_diff = 1 / (args->v_max - args->v_min);
 		float prp_diff = args->prp_z - args->back_plane;
 		if(prp_diff != 0)
 			prp_diff = 1 / prp_diff;
-		float scale_mat[4][4]{
-			{ 2 * args->prp_z * u_diff * prp_diff, 0, 0, 0 },
-			{ 0, 2 * args->prp_z * v_diff * prp_diff, 0, 0 },
-			{ 0, 0, prp_diff, 0 },
-			{ 0, 0, 0, 1 }
-		};
-		dotProduct(&(scale_mat[0][0]), &(res_mat[0][0]), &(norm_mat[0][0]), 4, 4, 4);
+		Eigen::Matrix<float, 4, 4> scale_mat;
+		scale_mat <<
+			2 * args->prp_z * u_diff * prp_diff, 0, 0, 0,
+			0, 2 * args->prp_z * v_diff * prp_diff, 0, 0,
+			0, 0, prp_diff, 0,
+			0, 0, 0, 1;
+		res_mat << scale_mat * norm_mat;
+		norm_mat = res_mat;
 	}
 
-	float old_coord[4][1]{
-		{ coord->x },
-		{ coord->y },
-		{ coord->z },
-		{ 1 }
-	};
-	float new_coord[4][1];
-	dotProduct(&(norm_mat[0][0]), &(old_coord[0][0]), &(new_coord[0][0]), 4, 4, 1);
-	coord->x = new_coord[0][0];
-	coord->y = new_coord[1][0];
-	coord->z = new_coord[2][0];
+	Eigen::Matrix<float, 4, 1> old_coord;
+	old_coord <<
+		coord->x,
+		coord->y,
+		coord->z,
+		1;
+	Eigen::Matrix<float, 4, 1> new_coord{ norm_mat * old_coord };
+
+	coord->x = new_coord[0];
+	coord->y = new_coord[1];
+	coord->z = new_coord[2];
 }
 
-void rotateViewplane(coordinate *rot_x, coordinate *rot_y, coordinate *rot_z, arguments *args)
+void rotateViewplane(Eigen::Matrix<float, 3, 1> *rot_x, Eigen::Matrix<float, 3, 1> *rot_y, Eigen::Matrix<float, 3, 1> *rot_z, arguments *args)
 {
-	float x_2 = std::pow(args->vpn_x, 2);
-	float y_2 = std::pow(args->vpn_y, 2);
-	float z_2 = std::pow(args->vpn_z, 2);
-	float norm = std::sqrt(x_2 + y_2 + z_2);
-	if(norm != 0)
-	{
-		rot_z->x = args->vpn_x / norm;
-		rot_z->y = args->vpn_y / norm;
-		rot_z->z = args->vpn_z / norm;
-	}
-	else
-	{
-		rot_z->x = 0;
-		rot_z->y = 0;
-		rot_z->z = 0;
-	}
+	*rot_z <<
+		args->vpn_x,
+		args->vpn_y,
+		args->vpn_z;
+	rot_z->normalize();
 
-	float x_cross = args->vup_y * rot_z->z - args->vup_z * rot_z->y;
-	float y_cross = args->vup_z * rot_z->x - args->vup_x * rot_z->z;
-	float z_cross = args->vup_x * rot_z->y - args->vup_y * rot_z->x;
-	x_2 = std::pow(x_cross, 2);
-	y_2 = std::pow(y_cross, 2);
-	z_2 = std::pow(z_cross, 2);
-	norm = std::sqrt(x_2 + y_2 + z_2);
+	*rot_x <<
+		args->vup_x,
+		args->vup_y,
+		args->vup_z;
+	*rot_x = rot_x->cross(*rot_z);
+	rot_x->normalize();
 
-	if(norm != 0)
-	{
-		rot_x->x = x_cross / norm;
-		rot_x->y = y_cross / norm;
-		rot_x->z = z_cross / norm;
-	}
-	else
-	{
-		rot_x->x = 0;
-		rot_x->y = 0;
-		rot_x->z = 0;
-	}
-
-	rot_y->x = rot_z->y * rot_x->z - rot_z->z * rot_x->y;
-	rot_y->y = rot_z->z * rot_x->x - rot_z->x * rot_x->z;
-	rot_y->z = rot_z->x * rot_x->y - rot_z->y * rot_x->x;
+	*rot_y = rot_z->cross(*rot_x);
 }
 
 void worldToViewport(coordinate *coord, arguments *args, bounds *ww_x_bounds, bounds *ww_y_bounds)
