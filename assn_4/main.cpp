@@ -16,12 +16,12 @@ int main(int argc, char *argv[])
 
 static error_t parse_opts(int key, char *arg_char, argp_state *state)
 {
-	if(arg_char == NULL && key != 'P')
+	if(arg_char == NULL && key != 'P' && key != 'b')
 		return 0;
 
 	arguments *args = (arguments *)state->input;
 	std::string arg;
-	if(key != 'P')
+	if(key != 'P' && key != 'b')
 		arg = arg_char;
 
 	switch(key)
@@ -114,6 +114,10 @@ static error_t parse_opts(int key, char *arg_char, argp_state *state)
 		args->parallel_proj = true;
 		break;
 
+	case 'b':
+		args->b_cull = true;
+		break;
+
 	case 'F':
 		args->clip_front = stof(arg);
 		break;
@@ -122,7 +126,7 @@ static error_t parse_opts(int key, char *arg_char, argp_state *state)
 		args->clip_back = stof(arg);
 		break;
 
-	case ARGP_KEY_ARG:
+		case ARGP_KEY_ARG:
 		if(state->arg_num > 9)
 			argp_usage(state);
 		break;
@@ -212,13 +216,21 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 
 				for(int i = 0; i < length; ++i)
 				{
-					if (!args->parallel_proj)
+					if (args->parallel_proj)
+					{
+						face[i].z = 0;
+					}
+					else
 					{
 						float z_d = face[i].z / z_proj;
 						face[i].x /= z_d;
 						face[i].y /= z_d;
+						face[i].z = z_proj;
 					}
 				}
+
+				if(args->b_cull && backfaceCulling(&face))
+					continue;
 
 				bounds window_x_bounds;
 				bounds window_y_bounds;
@@ -237,10 +249,6 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 				// Line drawing
 				for(int i = 0; i < length - 1; i++)
 				{
-					// Back-face culling
-					//if(face[i].z < 0)
-					//	continue;
-
 					float cmd_parts[4]{ face[i].x, face[i].y, face[i + 1].x, face[i + 1].y };
 					int draw_line{ clipLine(&(cmd_parts[0]), &window_x_bounds, &window_y_bounds) };
 					coordinate coords[2]{ {cmd_parts[0], cmd_parts[1]}, {cmd_parts[2], cmd_parts[3]} };

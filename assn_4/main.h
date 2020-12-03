@@ -37,6 +37,7 @@ const argp_option options[] {
 	{0, 'U', "u max of vrc window", 0, "floating point u max of the vrc window in vrc coordinates"},
 	{0, 'V', "v max of vrc window", 0, "floating point v max of the vrc window in vrc coordinates"},
 	{0, 'P', 0, 0, "Use parallel projection, otherwise use prespective projection"},
+	{0, 'b', 0, 0, "Use backface culling, otherwise don't"},
 	{0, 'F', "clip_front", 0, "floating point of front clipping plane"},
 	{0, 'B', "clip_back", 0, "floating point of back clipping plane"},
 	{0},

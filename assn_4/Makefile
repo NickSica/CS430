@@ -11,7 +11,7 @@ test: build
 	@echo "Starting default"
 	./$(name) > default.pbm
 	@echo "Starting circle 1"
-	./$(name) -f $(smf_file) -x -1.0 -z 0.5 -q 1.0 -w -0.5 > circle_1.pbm
+	./$(name) -f $(smf_file) -x -1.0 -z 0.5 -q 1.0 -w -0.5 -b > circle_1.pbm
 	@echo "Starting circle 2"
 	./$(name) -f $(smf_file) -q 1.0 -w -1.0 > circle_2.pbm
 	@echo "Starting circle 3"
@@ -27,9 +27,9 @@ test: build
 	@echo "Switching to cow"
 	$(eval smf_file=bound-cow.smf)
 	@echo "Starting cow default"
-	./$(name) -f $(smf_file) > cow_default.pbm
+	./$(name) -f $(smf_file) -b > cow_default.pbm
 	@echo "Starting cow parallel"
-	./$(name) -f $(smf_file) -P > cow_parallel.pbm
+	./$(name) -f $(smf_file) -P -b > cow_parallel.pbm
 	@echo "Starting cow jkopP"
 	./$(name) -f $(smf_file) -j 0 -k 30 -o 275 -p 305 -P > cow_jkopP.pbm
 	@echo "Starting cow x1.5"

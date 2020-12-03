@@ -40,6 +40,7 @@ struct arguments {
 	float u_max{ 0.7 }; // -U
 	float v_max{ 0.7 }; // -V
 	bool parallel_proj{ false }; // -P
+	bool b_cull{ false }; // -b
 
 	float clip_front{ 0.6 }; // -F
 	float clip_back{ -0.6 }; // -B
@@ -72,6 +73,7 @@ void shearCoord(coordinate *, arguments *, coordinate *, coordinate *, coordinat
 void scaleCoord(coordinate *, float *);
 void rotateViewplane(Eigen::Matrix<float, 3, 1> *, Eigen::Matrix<float, 3, 1> *, Eigen::Matrix<float, 3, 1> *, arguments *);
 void translateCoord(coordinate *, coordinate *);
+uint8_t backfaceCulling(std::vector<coordinate> *);
 int clipLine(float *, bounds *, bounds *);
 void clipPolygon(std::vector<coordinate> *, bounds *, bounds *);
 void fillPolygon(std::vector<std::vector<uint8_t>> *, std::vector<coordinate> *, bounds *, bounds *);

@@ -170,6 +170,32 @@ void translateCoord(coordinate *coord, coordinate *tran_coord)
 	coord->z = coord->z + tran_coord->z;
 }
 
+uint8_t backfaceCulling(std::vector<coordinate> *face)
+{
+	Eigen::Matrix<float, 3, 1> p0;
+	p0 <<
+		(*face)[0].x,
+		(*face)[0].y,
+		(*face)[0].z;
+
+	Eigen::Matrix<float, 3, 1> p1;
+	p1 <<
+		(*face)[1].x,
+		(*face)[1].y,
+		(*face)[1].z;
+
+	Eigen::Matrix<float, 3, 1> p2;
+	p2 <<
+		(*face)[2].x,
+		(*face)[2].y,
+		(*face)[2].z;
+
+	Eigen::Matrix<float, 3, 1> norm{ p1 - p0 };
+	norm = norm.cross(p2 - p0);
+	norm.normalize();
+	return norm[2] < 0;
+}
+
 // Uses Cohen-Sutherland algorithm to clip lines to world view, returns 1 if it should draw the line
 int clipLine(float *cmd_parts, bounds *x_bounds, bounds *y_bounds)
 {
