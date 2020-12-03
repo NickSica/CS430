@@ -67,7 +67,6 @@ struct edge {
 
 void applyTransformations(float *, int, arguments *);
 void worldToViewport(coordinate *, arguments *, bounds *, bounds *);
-//void dotProduct(float *mat1, float *mat2, int m1_rows, int m2_cols);
 void normalize(coordinate *, arguments *);
 void shearCoord(coordinate *, arguments *, coordinate *, coordinate *, coordinate *);
 void scaleCoord(coordinate *, float *);

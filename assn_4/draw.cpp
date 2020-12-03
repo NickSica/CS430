@@ -1,20 +1,5 @@
 #include "draw.h"
 
-// Quick and dirty dot product
-void dotProduct(float *mat1, float *mat2, float *result, int m1_rows, int m1_cols, int m2_cols)
-{
-	for(int i = 0; i < m1_rows; ++i)
-	{
-		for (int j = 0; j < m2_cols; ++j)
-		{
-			float dot = 0;
-			for (int k = 0; k < m1_cols; ++k)
-				dot += *(mat1 + m1_cols * i + k) * *(mat2 + m2_cols * k + j);
-			*(result + m2_cols * i + j) = dot;
-		}
-	}
-}
-
 void normalize(coordinate *coord, arguments *args)
 {
 	Eigen::Matrix<float, 4, 4> norm_mat;
