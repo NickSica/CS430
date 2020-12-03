@@ -7,6 +7,8 @@
 #include <vector>
 #include <algorithm>
 #include <bitset>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 struct arguments {
 	std::string smf_file{ "bound-lo-sphere.smf" }; // -f
@@ -69,7 +71,7 @@ void worldToViewport(coordinate *, arguments *, bounds *, bounds *);
 void normalize(coordinate *, arguments *);
 void shearCoord(coordinate *, arguments *, coordinate *, coordinate *, coordinate *);
 void scaleCoord(coordinate *, float *);
-void rotateViewplane(coordinate *, coordinate *, coordinate *, arguments *);
+void rotateViewplane(Eigen::Matrix<float, 3, 1> *, Eigen::Matrix<float, 3, 1> *, Eigen::Matrix<float, 3, 1> *, arguments *);
 void translateCoord(coordinate *, coordinate *);
 int clipLine(float *, bounds *, bounds *);
 void clipPolygon(std::vector<coordinate> *, bounds *, bounds *);
