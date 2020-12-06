@@ -224,14 +224,12 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 				else if(cmd_type == curve)
 				{
 					int bez_pow{ 4 };
-					coordinate control_points[bez_pow];
-					for(int i = bez_pow - 1; i >= 0; --i)
-					{
-						control_points[i] = vertices.back();
-						vertices.pop_back();
-					}
+					coordinate control_points[bez_pow + 1];
+					for(int i = 1; i <= bez_pow; ++i)
+						control_points[i] = vertices[i - 1];
 
-					computeBezier(&vertices, &control_points[0], args);
+					vertices.clear();
+					computeBezier(&vertices, &control_points[0], bez_pow - 1, args);
 					for(int i = 0; i < vertices.size() - 1; ++i)
 					{
 						float line_seg[]{ vertices[i].x, vertices[i].y, vertices[i + 1].x, vertices[i + 1].y };

@@ -325,34 +325,48 @@ void fillPolygon(std::vector<std::vector<uint8_t>> *pixels, std::vector<coordina
 	}
 }
 
-void computeBezier(std::vector<coordinate> *coords, coordinate *ctrl_pts, arguments *args)
+int factorial(int num)
+{
+	if(num == 1 || num == 0)
+		return 1;
+	else
+		return factorial(num - 1) * num;
+}
+
+float pow(float num, int pow)
+{
+	float ans{ 1 };
+	if(pow == 0)
+		return 1;
+
+	for(int i = 0; i < pow; ++i)
+		ans *= num;
+
+	return ans;
+}
+
+void computeBezier(std::vector<coordinate> *coords, coordinate *ctrl_pts, int degree, arguments *args)
 {
 	float incr = 1.0 / (float)args->num_segments;
 	coords->reserve(args->num_segments);
-	for(float i = 0; i < 1; i += incr)
+	int k_fact{ factorial(degree) };
+	float k_choose_i[degree + 1];
+	for(int i = 0; i <= degree; ++i)
+		k_choose_i[i] = (float)k_fact / (float)(factorial(i) * factorial(degree - i));
+
+	for(float u = 0; u < 1; u += incr)
 	{
-		float t_diff = 1 - i;
-		float t_diff_2 = t_diff * t_diff;
-		float t_diff_3 = t_diff_2 * t_diff;
-		float i_2 = i * i;
-		float i_3 = i_2 * i;
+		float x{ 0 };
+		float y{ 0 };
+		for(int i = 0; i <= degree; ++i)
+		{
+			x += k_choose_i[i] * pow((1 - u), degree - i) * pow(u, i) * ctrl_pts[i + 1].x;
+			y += k_choose_i[i] * pow((1 - u), degree - i) * pow(u, i) * ctrl_pts[i + 1].y;
+		}
 
-		float p1_x = t_diff_3 * ctrl_pts[0].x;
-		float p2_x = 3 * i * t_diff_2 * ctrl_pts[1].x;
-		float p3_x = 3 * i_2 * t_diff * ctrl_pts[2].x;
-		float p4_x = i_3 * ctrl_pts[3].x;
-
-		float p1_y = t_diff_3 * ctrl_pts[0].y;
-		float p2_y = 3 * i * t_diff_2 * ctrl_pts[1].y;
-		float p3_y = 3 * i_2 * t_diff * ctrl_pts[2].y;
-		float p4_y = i_3 * ctrl_pts[3].y;
-
-		float x = p1_x + p2_x + p3_x + p4_x;
-		float y = p1_y + p2_y + p3_y + p4_y;
 		coords->push_back({ x, y });
 	}
-	coords->push_back({ ctrl_pts[3].x, ctrl_pts[3].y });
-	// (1-t)^3 * P1 + 3t(1 - t)^2 * P2 + 3t^2 * (1 - t) * P3 + t^3 * P4
+	coords->push_back({ ctrl_pts[4].x, ctrl_pts[4].y });
 }
 
 // Uses DDA algorithm to scan convert lines

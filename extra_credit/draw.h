@@ -52,7 +52,7 @@ void translateCoord(coordinate *, int, int);
 int clipLine(float *, bounds *, bounds *);
 void clipPolygon(std::vector<coordinate> *, bounds *, bounds *);
 void fillPolygon(std::vector<std::vector<uint8_t>> *, std::vector<coordinate> *, bounds *, bounds *);
-void computeBezier(std::vector<coordinate> *, coordinate *, arguments *args);
+void computeBezier(std::vector<coordinate> *, coordinate *, int degree, arguments *args);
 void scanConversion(float *, std::vector<std::vector<uint8_t>> *, bounds *, bounds *);
 
 #endif
