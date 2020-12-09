@@ -62,12 +62,12 @@ static error_t parse_opts(int key, char *arg_char, argp_state *state)
 	case 'd':
 		args->y_upper_bound = stoi(arg);
 		break;
-		
+
 	case ARGP_KEY_ARG:
 		if(state->arg_num > 9)
 			argp_usage(state);
 		break;
-		
+
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
@@ -95,33 +95,33 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 			cmd_block = true;
 			continue;
 		}
-		
+
 		if(line.substr(0, 6) == "%%%END")
 		{
 			cmd_block = false;
 			continue;
 		}
-		
+
 		// In the command block and it has more than just whitespace
 		if(cmd_block && !isspace(line[0]))
 		{
 			// Trim right whitespace
 			while(isspace(line[line.length() - 1]))
-				line = line.substr(0, line.length() - 2);
-			
+				line = line.substr(0, line.length() - 1);
+
 			std::string cmd;
 			if(line != "stroke")
 				cmd = line.substr(line.rfind(' ') + 1);
 			else
 				cmd = "stroke";
-			
+
 			if(cmd == "Line")
 			{
 				int length = 4;
 				float cmd_parts[length];
 				std::string line_parts[length];
 				int split_success = splitLines(line, ' ', &line_parts[0], length);
-				
+
 				for(int i = 0; i < length; i++) cmd_parts[i] = std::stoi(line_parts[i]);
 				applyTransformations(&cmd_parts[0], length, &transforms);
 				int draw_line{ clipLine(&cmd_parts[0], &x_bounds, &y_bounds) };
@@ -135,7 +135,7 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 				float cmd_parts[length];
 				std::string line_parts[length];
 				int split_success = splitLines(line, ' ', &line_parts[0], length);
-				
+
 				for(int i = 0; i < length; i++) cmd_parts[i] = std::stof(line_parts[i]);
 				applyTransformations(&cmd_parts[0], length, &transforms);
 				coords vertex = { cmd_parts[0], cmd_parts[1] };
@@ -147,7 +147,7 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 				float cmd_parts[length];
 				std::string line_parts[length];
 				int split_success = splitLines(line, ' ', &line_parts[0], length);
-				
+
 				for(int i = 0; i < length; i++) cmd_parts[i] = std::stof(line_parts[i]);
 				applyTransformations(&cmd_parts[0], length, &transforms);
 				coords vertex = { cmd_parts[0], cmd_parts[1] };
@@ -171,7 +171,7 @@ int splitLines(std::string line, char split_char, std::string *line_parts, int n
 	int idx{ 0 };
 	size_t start{ 0 };
 	size_t end{ line.find(split_char) };
-	
+
 	// Splits line using character
 	while(end != std::string::npos)
 	{
@@ -205,4 +205,3 @@ void printPBM(std::vector<std::vector<uint8_t>> *pixels)
 	std::cout << line.substr(0, line.length() - 1) << "\n";
 	}
 }
-

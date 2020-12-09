@@ -128,7 +128,7 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 		{
 			// Trim right whitespace
 			while(isspace(file_line[file_line.length() - 1]))
-				file_line = file_line.substr(0, file_line.length() - 2);
+				file_line = file_line.substr(0, file_line.length() - 1);
 
 			std::string cmd;
 			if(file_line != "stroke")

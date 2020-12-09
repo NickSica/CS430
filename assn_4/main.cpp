@@ -153,7 +153,7 @@ void parseSMFFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
 		std::cerr << line << "\n";
 		// Trim right whitespace
 		while(isspace(line[line.length() - 1]))
-			line = line.substr(0, line.length() - 2);
+			line = line.substr(0, line.length() - 1);
 
 		if(line[0] == '#')
 		{

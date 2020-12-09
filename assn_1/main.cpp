@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
 
     std::cerr << "Arguments are " << args.pscript_file << " " << args.scaling_factor << " " << args.rot_deg
             << " " << args.x_translation << " " << args.y_translation << " " << args.x_lower_bound << " " << args.y_lower_bound << "\n";
-    
+
     size_t x = (size_t)(args.x_upper_bound - args.x_lower_bound + 1);
     size_t y = (size_t)(args.y_upper_bound - args.y_lower_bound + 1);
 
@@ -63,12 +63,12 @@ static error_t parse_opts(int key, char *arg_char, argp_state *state)
     case 'd':
         args->y_upper_bound = stoi(arg);
         break;
-        
+
     case ARGP_KEY_ARG:
         if(state->arg_num > 9)
             argp_usage(state);
         break;
-        
+
     default:
         return ARGP_ERR_UNKNOWN;
     }
@@ -109,7 +109,7 @@ void parsePSFile(arguments *args, std::vector<std::vector<uint8_t>> *pixels)
             {
                 // Trim right whitespace
                 while(isspace(line[line.length() - 1]))
-                    line = line.substr(0, line.length() - 2);
+                    line = line.substr(0, line.length() - 1);
 
                 std::string cmd{ line.substr(line.rfind(' ') + 1) };
                 if(cmd == "Line")
